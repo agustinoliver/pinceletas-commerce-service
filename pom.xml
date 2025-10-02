@@ -97,7 +97,13 @@
 			<optional>true</optional>
 		</dependency>
 
-		<!-- REMOVIDO: SDK MercadoPago - Ahora usamos RestClient -->
+
+		<dependency>
+			<groupId>ar.edu.utn.frc.tup.tesis</groupId>
+			<artifactId>pinceletas-common-security</artifactId>
+			<version>1.0.0</version>
+		</dependency>
+
 
 	</dependencies>
 

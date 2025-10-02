@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -30,6 +31,7 @@ public class ProductoController {
     private final ProductoService productoService;
 
     // ✅ POST CON IMAGEN - VERSIÓN CON CAMPOS INDIVIDUALES
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @PostMapping(value = "/productos", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @Operation(summary = "Crear producto con imagen")
     @ApiResponses({
@@ -92,6 +94,7 @@ public class ProductoController {
 //    }
 
 
+    @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
     public ResponseEntity<ProductoEntity> modificarProducto(@PathVariable Long id,
                                                             @RequestBody ProductoDTO dto,
@@ -101,6 +104,7 @@ public class ProductoController {
         return ResponseEntity.ok(actualizado);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarProducto(@PathVariable Long id,
                                                  @RequestParam Long usuarioId) {
@@ -108,18 +112,21 @@ public class ProductoController {
         return ResponseEntity.noContent().build();
     }
 
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @GetMapping("/{id}")
     public ResponseEntity<ProductoEntity> obtenerProducto(@PathVariable Long id) {
         ProductoEntity producto = productoService.getProductoById(id);
         return ResponseEntity.ok(producto);
     }
 
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @GetMapping
     public ResponseEntity<List<ProductoEntity>> listarProductos() {
         List<ProductoEntity> productos = productoService.listarProductos();
         return ResponseEntity.ok(productos);
     }
 
+    @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/{id}/auditoria")
     public ResponseEntity<List<AuditoriaProductoEntity>> obtenerAuditoria(@PathVariable Long id) {
         return ResponseEntity.ok(productoService.consultarAuditoriaProducto(id));

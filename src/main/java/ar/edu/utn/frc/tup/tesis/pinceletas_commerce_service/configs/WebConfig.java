@@ -16,19 +16,9 @@ import java.util.stream.Collectors;
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
 
-    @Value("${app.cors.allowed-origins}")
-    private String allowedOrigins;
-
     @Value("${app.uploads.path}")
     private String uploadsPath;
 
-    @Override
-    public void addCorsMappings(CorsRegistry registry) {
-        registry.addMapping("/**")
-                .allowedOrigins(allowedOrigins)
-                .allowedMethods("GET", "POST", "PUT", "DELETE", "OPTIONS")
-                .allowedHeaders("*");
-    }
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {

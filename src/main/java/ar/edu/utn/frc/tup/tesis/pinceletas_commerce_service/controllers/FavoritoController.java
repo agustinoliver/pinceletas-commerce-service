@@ -6,6 +6,7 @@ import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.services.FavoritoSer
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -18,6 +19,7 @@ public class FavoritoController {
     private final FavoritoService favoritoService;
 
     // Registrar producto en favoritos
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @PostMapping
     public ResponseEntity<FavoritoEntity> agregarAFavoritos(@RequestBody FavoritoDTO favoritoDTO) {
         FavoritoEntity favorito = favoritoService.agregarAFavoritos(favoritoDTO);
@@ -26,6 +28,7 @@ public class FavoritoController {
 
 
     // Eliminar producto de favoritos
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @DeleteMapping
     public ResponseEntity<Void> eliminarDeFavoritos(@RequestParam Long usuarioId,
                                                     @RequestParam Long productoId) {
@@ -34,6 +37,7 @@ public class FavoritoController {
     }
 
     // Consultar productos favoritos por usuario
+    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
     @GetMapping("/{usuarioId}")
     public ResponseEntity<List<FavoritoEntity>> obtenerFavoritos(@PathVariable Long usuarioId) {
         return ResponseEntity.ok(favoritoService.obtenerFavoritos(usuarioId));
