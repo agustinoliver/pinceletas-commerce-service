@@ -76,37 +76,6 @@ public class ProductoService {
         return saved;
     }
 
-
-
-
-
-
-
-
-//    public ProductoEntity registrarProducto(ProductoDTO dto, Long usuarioId) {
-//        CategoriaEntity categoria = new CategoriaEntity();
-//        categoria.setId(dto.getCategoriaId());
-//
-//        ProductoEntity producto = new ProductoEntity();
-//        producto.setNombre(dto.getNombre());
-//        producto.setDescripcion(dto.getDescripcion());
-//        producto.setPrecio(dto.getPrecio());
-//        producto.setImagen(dto.getImagen());
-//        producto.setActivo(dto.getActivo());
-//        producto.setCategoria(categoria);
-//
-//        // Asociar opciones existentes (compartidas)
-//        if (dto.getOpcionesIds() != null && !dto.getOpcionesIds().isEmpty()) {
-//            List<OpcionProductoEntity> opciones = opcionProductoRepository.findAllById(dto.getOpcionesIds());
-//            producto.setOpciones(opciones);
-//        }
-//
-//        ProductoEntity saved = productoRepository.save(producto);
-//        registrarAuditoria(null, saved, AccionAuditoria.CREAR, usuarioId);
-//        return saved;
-//    }
-
-
     // ---------------------- MODIFICAR PRODUCTO ----------------------
 
     public ProductoDTO modificarProducto(Long id, ProductoDTO dto, Long usuarioId) {
@@ -143,6 +112,57 @@ public class ProductoService {
         return mapToDto(saved);
     }
 
+    // ---------------------- MODIFICAR PRODUCTO CON IMAGEN ----------------------
+
+    public ProductoEntity modificarProductoConImagen(Long id, ProductoDTO dto, MultipartFile imagenFile, Long usuarioId) {
+        ProductoEntity original = productoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
+
+        ProductoEntity anterior = new ProductoEntity();
+        modelMapper.map(original, anterior); // copia para auditoría
+
+        // Modificamos manualmente los campos que vienen del DTO
+        original.setNombre(dto.getNombre());
+        original.setDescripcion(dto.getDescripcion());
+        original.setPrecio(dto.getPrecio());
+        original.setActivo(dto.getActivo());
+
+        // Actualizar imagen si se proporciona
+        if (imagenFile != null && !imagenFile.isEmpty()) {
+            try {
+                String uploadsDir = "uploads/";
+                String originalFilename = imagenFile.getOriginalFilename();
+                Path filePath = Paths.get(uploadsDir + originalFilename);
+
+                Files.createDirectories(filePath.getParent());
+                Files.copy(imagenFile.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+                original.setImagen("/uploads/" + originalFilename);
+            } catch (IOException e) {
+                throw new RuntimeException("Error al guardar imagen", e);
+            }
+        }
+
+        // Actualizar categoría
+        if (dto.getCategoriaId() != null) {
+            CategoriaEntity categoria = categoriaRepository.findById(dto.getCategoriaId())
+                    .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
+            original.setCategoria(categoria);
+        }
+
+        // ✅ Actualizar opciones (ManyToMany: se setea la lista completa)
+        if (dto.getOpcionesIds() != null) {
+            List<OpcionProductoEntity> nuevasOpciones = opcionProductoRepository.findAllById(dto.getOpcionesIds());
+            original.setOpciones(nuevasOpciones);
+        } else {
+            original.setOpciones(null);
+        }
+
+        ProductoEntity saved = productoRepository.save(original);
+        registrarAuditoria(anterior, saved, AccionAuditoria.MODIFICAR, usuarioId);
+        return saved;
+    }
+
     // ---------------------- ELIMINAR PRODUCTO ----------------------
 
     public void eliminarProducto(Long id, Long usuarioId) {
@@ -164,9 +184,10 @@ public class ProductoService {
         return productoRepository.findAll();
     }
 
-    public List<AuditoriaProductoEntity> consultarAuditoriaProducto(Long productoId) {
-        return auditoriaProductoRepository.findByProductoId(productoId);
+    public List<AuditoriaProductoEntity> consultarAuditoriasProductos() {
+        return auditoriaProductoRepository.findAll();
     }
+
 
     // ---------------------- MAPPERS ----------------------
 
@@ -192,7 +213,6 @@ public class ProductoService {
 
         return dto;
     }
-
 
     // ---------------------- AUDITORÍA ----------------------
 
@@ -245,5 +265,4 @@ public class ProductoService {
             return "{}";
         }
     }
-
 }

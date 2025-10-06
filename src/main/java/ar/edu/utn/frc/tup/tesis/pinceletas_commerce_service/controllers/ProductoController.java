@@ -86,13 +86,65 @@ public class ProductoController {
         return ResponseEntity.status(HttpStatus.CREATED).body(creado);
     }
 
+    // ✅ PUT CON IMAGEN - NUEVO ENDPOINT PARA ACTUALIZAR CON IMAGEN
+    @PreAuthorize("hasRole('ADMIN')")
+    @PutMapping(value = "/{id}/con-imagen", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(summary = "Actualizar producto con imagen")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Producto actualizado"),
+            @ApiResponse(responseCode = "404", description = "Producto no encontrado")
+    })
+    public ResponseEntity<ProductoEntity> modificarProductoConImagen(
+            @Parameter(description = "ID del producto", required = true)
+            @PathVariable Long id,
 
-//    @PostMapping
-//    public ResponseEntity<ProductoEntity> crearProducto(@RequestBody ProductoDTO dto, @RequestParam Long usuarioId) {
-//        ProductoEntity creado = productoService.registrarProducto(dto, usuarioId); // nuevo método
-//        return ResponseEntity.status(HttpStatus.CREATED).body(creado);
-//    }
+            @Parameter(description = "Nombre del producto", required = true)
+            @RequestParam("nombre") String nombre,
 
+            @Parameter(description = "Descripción del producto")
+            @RequestParam(value = "descripcion", required = false) String descripcion,
+
+            @Parameter(description = "Precio del producto", required = true)
+            @RequestParam("precio") BigDecimal precio,
+
+            @Parameter(description = "Si el producto está activo", required = true)
+            @RequestParam("activo") Boolean activo,
+
+            @Parameter(description = "ID de la categoría", required = true)
+            @RequestParam("categoriaId") Long categoriaId,
+
+            @Parameter(description = "IDs de las opciones (separados por coma, ej: 1,2,3)")
+            @RequestParam(value = "opcionesIds", required = false) String opcionesIdsStr,
+
+            @Parameter(description = "Imagen del producto", required = false)
+            @RequestPart(value = "imagen", required = false) MultipartFile imagen,
+
+            @Parameter(description = "ID del usuario", required = true)
+            @RequestParam Long usuarioId) {
+
+        // Construir el DTO manualmente
+        ProductoDTO producto = ProductoDTO.builder()
+                .nombre(nombre)
+                .descripcion(descripcion)
+                .precio(precio)
+                .activo(activo)
+                .categoriaId(categoriaId)
+                .imagen("") // Se llenará en el servicio si se proporciona imagen
+                .build();
+
+        // Procesar opcionesIds si existen
+        if (opcionesIdsStr != null && !opcionesIdsStr.trim().isEmpty()) {
+            List<Long> opcionesIds = Arrays.stream(opcionesIdsStr.split(","))
+                    .map(String::trim)
+                    .filter(s -> !s.isEmpty())
+                    .map(Long::valueOf)
+                    .collect(Collectors.toList());
+            producto.setOpcionesIds(opcionesIds);
+        }
+
+        ProductoEntity actualizado = productoService.modificarProductoConImagen(id, producto, imagen, usuarioId);
+        return ResponseEntity.ok(actualizado);
+    }
 
     @PreAuthorize("hasRole('ADMIN')")
     @PutMapping("/{id}")
@@ -127,8 +179,9 @@ public class ProductoController {
     }
 
     @PreAuthorize("hasRole('ADMIN')")
-    @GetMapping("/{id}/auditoria")
-    public ResponseEntity<List<AuditoriaProductoEntity>> obtenerAuditoria(@PathVariable Long id) {
-        return ResponseEntity.ok(productoService.consultarAuditoriaProducto(id));
+    @GetMapping("/auditorias")
+    public ResponseEntity<List<AuditoriaProductoEntity>> obtenerAuditorias() {
+        return ResponseEntity.ok(productoService.consultarAuditoriasProductos());
     }
+
 }
