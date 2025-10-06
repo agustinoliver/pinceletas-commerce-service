@@ -1,0 +1,112 @@
+package ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.controllers;
+
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.FavoritoDTO;
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.entities.FavoritoEntity;
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.services.FavoritoService;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.setup.MockMvcBuilders;
+
+import java.util.Arrays;
+import java.util.List;
+
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+@ExtendWith(MockitoExtension.class)
+class FavoritoControllerTest {
+
+    private MockMvc mockMvc;
+
+    @Mock
+    private FavoritoService favoritoService;
+
+    @InjectMocks
+    private FavoritoController favoritoController;
+
+    private ObjectMapper objectMapper;
+
+    @BeforeEach
+    void setUp() {
+        mockMvc = MockMvcBuilders.standaloneSetup(favoritoController).build();
+        objectMapper = new ObjectMapper();
+    }
+
+    @Test
+    void agregarAFavoritos() throws Exception {
+        // Given
+        FavoritoDTO favoritoDTO = new FavoritoDTO();
+        favoritoDTO.setUsuarioId(1L);
+        favoritoDTO.setProductoId(1L);
+
+        FavoritoEntity favoritoEntity = new FavoritoEntity();
+        favoritoEntity.setId(1L);
+        favoritoEntity.setUsuarioId(1L);
+
+        when(favoritoService.agregarAFavoritos(any(FavoritoDTO.class)))
+                .thenReturn(favoritoEntity);
+
+        // When & Then
+        mockMvc.perform(post("/favoritos")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(favoritoDTO)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value(1L))
+                .andExpect(jsonPath("$.usuarioId").value(1L));
+
+        verify(favoritoService, times(1)).agregarAFavoritos(any(FavoritoDTO.class));
+    }
+
+    @Test
+    void eliminarDeFavoritos() throws Exception {
+        // Given
+        Long usuarioId = 1L;
+        Long productoId = 1L;
+
+        doNothing().when(favoritoService).eliminarDeFavoritos(usuarioId, productoId);
+
+        // When & Then
+        mockMvc.perform(delete("/favoritos")
+                        .param("usuarioId", usuarioId.toString())
+                        .param("productoId", productoId.toString()))
+                .andExpect(status().isNoContent());
+
+        verify(favoritoService, times(1)).eliminarDeFavoritos(usuarioId, productoId);
+    }
+
+    @Test
+    void obtenerFavoritos() throws Exception {
+        // Given
+        Long usuarioId = 1L;
+
+        FavoritoEntity favorito1 = new FavoritoEntity();
+        favorito1.setId(1L);
+        favorito1.setUsuarioId(usuarioId);
+
+        FavoritoEntity favorito2 = new FavoritoEntity();
+        favorito2.setId(2L);
+        favorito2.setUsuarioId(usuarioId);
+
+        List<FavoritoEntity> favoritos = Arrays.asList(favorito1, favorito2);
+
+        when(favoritoService.obtenerFavoritos(usuarioId)).thenReturn(favoritos);
+
+        // When & Then
+        mockMvc.perform(get("/favoritos/{usuarioId}", usuarioId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value(1L))
+                .andExpect(jsonPath("$[1].id").value(2L));
+
+        verify(favoritoService, times(1)).obtenerFavoritos(usuarioId);
+    }
+}

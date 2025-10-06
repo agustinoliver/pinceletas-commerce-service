@@ -1,0 +1,28 @@
+package ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.services;
+
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.*;
+
+class OpcionProductoServiceTest {
+
+    @Test
+    void crearOpcion() {
+    }
+
+    @Test
+    void modificarOpcion() {
+    }
+
+    @Test
+    void eliminarOpcion() {
+    }
+
+    @Test
+    void obtenerPorProducto() {
+    }
+
+    @Test
+    void listarTodas() {
+    }
+}

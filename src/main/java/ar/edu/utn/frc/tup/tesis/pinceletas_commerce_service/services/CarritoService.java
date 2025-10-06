@@ -17,7 +17,6 @@ public class CarritoService {
 
     private final CarritoRepository carritoRepository;
     private final ProductoRepository productoRepository;
-    private final OpcionProductoRepository opcionRepository;
 
     public CarritoEntity agregarProducto(Long usuarioId, Long productoId, int cantidad) {
         ProductoEntity producto = productoRepository.findById(productoId)
