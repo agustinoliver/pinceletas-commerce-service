@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.entities;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -31,12 +32,12 @@ public class ProductoEntity {
 
     private Boolean activo;
 
-    @ManyToOne
+    @ManyToOne(fetch = FetchType.EAGER) // ✅ Asegura que cargue la categoría
     @JoinColumn(name = "categoria_id")
-    @JsonBackReference // 🔁 Evita que se serialice "productos" dentro de la categoría
+    @JsonIgnoreProperties("productos") // ✅ Ignora solo la lista de productos dentro de categoría
     private CategoriaEntity categoria;
 
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
             name = "producto_opciones",
             joinColumns = @JoinColumn(name = "producto_id"),

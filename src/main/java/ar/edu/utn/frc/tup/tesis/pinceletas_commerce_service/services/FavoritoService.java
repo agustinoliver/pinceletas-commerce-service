@@ -5,6 +5,7 @@ import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.entities.FavoritoEnt
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.entities.ProductoEntity;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.repositories.FavoritoRepository;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.repositories.ProductoRepository;
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -35,6 +36,7 @@ public class FavoritoService {
         return favoritoRepository.save(favorito);
     }
 
+    @Transactional
     public void eliminarDeFavoritos(Long usuarioId, Long productoId) {
         favoritoRepository.deleteByUsuarioIdAndProductoId(usuarioId, productoId);
     }

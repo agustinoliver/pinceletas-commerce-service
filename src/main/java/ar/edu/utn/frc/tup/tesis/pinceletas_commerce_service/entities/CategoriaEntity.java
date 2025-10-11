@@ -19,9 +19,10 @@ public class CategoriaEntity {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(unique = true, nullable = false)
     private String nombre;
 
-    @OneToMany(mappedBy = "categoria")
-    @JsonManagedReference // ✅ Omitir si no necesitás incluir productos dentro de categoría
+    @OneToMany(mappedBy = "categoria", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @JsonManagedReference
     private List<ProductoEntity> productos;
 }
