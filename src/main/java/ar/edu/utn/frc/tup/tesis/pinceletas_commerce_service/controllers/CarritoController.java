@@ -25,7 +25,7 @@ public class CarritoController {
     public ResponseEntity<CarritoEntity> agregarProducto(
             @RequestParam Long usuarioId,
             @RequestBody CarritoRequestDTO request) {
-        CarritoEntity item = carritoService.agregarProducto(usuarioId, request.getProductoId(), request.getCantidad());
+        CarritoEntity item = carritoService.agregarProducto(usuarioId, request.getProductoId(), request.getCantidad(), request.getOpcionSeleccionadaId());
         return ResponseEntity.status(HttpStatus.CREATED).body(item);
     }
 

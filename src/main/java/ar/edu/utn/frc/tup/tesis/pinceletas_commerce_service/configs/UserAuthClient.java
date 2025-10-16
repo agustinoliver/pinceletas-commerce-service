@@ -1,0 +1,86 @@
+package ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.configs;
+
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.UserResponseDTO;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.*;
+import org.springframework.stereotype.Component;
+import org.springframework.web.client.RestTemplate;
+
+@Component
+@RequiredArgsConstructor
+@Slf4j
+public class UserAuthClient {private final RestTemplate restTemplate;
+
+    @Value("${services.user-auth.url:http://localhost:8081}")
+    private String userAuthServiceUrl;
+
+    public UserResponseDTO obtenerUsuarioPorEmail(String email, String token) {
+        try {
+            String url = userAuthServiceUrl + "/api/users/profile/" + email;
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + token);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            ResponseEntity<UserResponseDTO> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    UserResponseDTO.class
+            );
+
+            if (response.getStatusCode() == HttpStatus.OK && response.getBody() != null) {
+                return response.getBody();
+            } else {
+                throw new RuntimeException("Usuario no encontrado o error en la respuesta");
+            }
+
+        } catch (Exception e) {
+            log.error("Error al obtener usuario por email {}: {}", email, e.getMessage());
+            throw new RuntimeException("Error al obtener datos del usuario: " + e.getMessage());
+        }
+    }
+
+    public UserResponseDTO obtenerUsuarioPorId(Long userId, String token) {
+        try {
+            // Primero necesitamos obtener el email del usuario
+            // Esto podría requerir un endpoint adicional en user-auth-service
+            // Por ahora, asumimos que podemos obtener por email
+            // En una implementación real, necesitaríamos un endpoint por ID
+            throw new UnsupportedOperationException("Obtener usuario por ID no implementado. Use obtenerUsuarioPorEmail.");
+
+        } catch (Exception e) {
+            log.error("Error al obtener usuario por ID {}: {}", userId, e.getMessage());
+            throw new RuntimeException("Error al obtener datos del usuario: " + e.getMessage());
+        }
+    }
+
+    public boolean validarToken(String token) {
+        try {
+            String url = userAuthServiceUrl + "/api/users/profile/validate-token";
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + token);
+            headers.setContentType(MediaType.APPLICATION_JSON);
+
+            HttpEntity<String> entity = new HttpEntity<>(headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url,
+                    HttpMethod.GET,
+                    entity,
+                    String.class
+            );
+
+            return response.getStatusCode() == HttpStatus.OK;
+
+        } catch (Exception e) {
+            log.error("Error al validar token: {}", e.getMessage());
+            return false;
+        }
+    }
+}

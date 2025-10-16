@@ -32,6 +32,9 @@ public class ProductoEntity {
 
     private Boolean activo;
 
+    @Column(nullable = false)
+    private BigDecimal descuentoPorcentaje = BigDecimal.ZERO;
+
     @ManyToOne(fetch = FetchType.EAGER) // ✅ Asegura que cargue la categoría
     @JoinColumn(name = "categoria_id")
     @JsonIgnoreProperties("productos") // ✅ Ignora solo la lista de productos dentro de categoría

@@ -35,23 +35,42 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/health", "/actuator/health").permitAll()
+
                         .requestMatchers("/productos/public/**").permitAll()
                         .requestMatchers("/uploads/**").permitAll()
+
+                        // ✅ 2. WEBHOOK DE MERCADO PAGO (MUY IMPORTANTE QUE ESTÉ ANTES)
+                        .requestMatchers(HttpMethod.POST, "/pedidos/webhook").permitAll()
+
+                        // ✅ 3. RUTAS MÁS ESPECÍFICAS DE PEDIDOS PRIMERO
+                        .requestMatchers(HttpMethod.GET, "/pedidos/usuario/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/pedidos/numero/**").hasAnyRole("USER", "ADMIN")
+
+                        // ✅ 4. LUEGO RUTAS GENERALES DE PEDIDOS
+                        .requestMatchers(HttpMethod.POST, "/pedidos").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/pedidos/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/pedidos/**").hasRole("ADMIN")
+
 
                         .requestMatchers(HttpMethod.GET, "/productos/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/productos/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/productos/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/productos/**").hasRole("ADMIN")
+
                         .requestMatchers(HttpMethod.GET, "/categorias/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/categorias/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/categorias/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/categorias/**").hasRole("ADMIN")
+
                         .requestMatchers(HttpMethod.GET, "/opciones-productos/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.POST, "/opciones-productos/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.PUT, "/opciones-productos/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/opciones-productos/**").hasRole("ADMIN")
+
                         .requestMatchers("/favoritos/**").hasAnyRole("USER", "ADMIN")
+
                         .requestMatchers("/carrito/**").hasAnyRole("USER", "ADMIN")
+
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

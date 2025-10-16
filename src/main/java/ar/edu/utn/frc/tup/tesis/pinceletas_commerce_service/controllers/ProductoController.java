@@ -47,6 +47,9 @@ public class ProductoController {
             @Parameter(description = "Precio del producto", required = true)
             @RequestParam("precio") BigDecimal precio,
 
+            @Parameter(description = "Descuento en porcentaje (0-100)")
+            @RequestParam(value = "descuentoPorcentaje", required = false) BigDecimal descuentoPorcentaje,
+
             @Parameter(description = "Si el producto está activo", required = true)
             @RequestParam("activo") Boolean activo,
 
@@ -69,6 +72,7 @@ public class ProductoController {
                 .precio(precio)
                 .activo(activo)
                 .categoriaId(categoriaId)
+                .descuentoPorcentaje(descuentoPorcentaje != null ? descuentoPorcentaje : BigDecimal.ZERO)
                 .imagen("") // Se llenará en el servicio
                 .build();
 
@@ -107,6 +111,9 @@ public class ProductoController {
             @Parameter(description = "Precio del producto", required = true)
             @RequestParam("precio") BigDecimal precio,
 
+            @Parameter(description = "Descuento en porcentaje (0-100)")
+            @RequestParam(value = "descuentoPorcentaje", required = false) BigDecimal descuentoPorcentaje,
+
             @Parameter(description = "Si el producto está activo", required = true)
             @RequestParam("activo") Boolean activo,
 
@@ -129,6 +136,7 @@ public class ProductoController {
                 .precio(precio)
                 .activo(activo)
                 .categoriaId(categoriaId)
+                .descuentoPorcentaje(descuentoPorcentaje != null ? descuentoPorcentaje : BigDecimal.ZERO)
                 .imagen("") // Se llenará en el servicio si se proporciona imagen
                 .build();
 

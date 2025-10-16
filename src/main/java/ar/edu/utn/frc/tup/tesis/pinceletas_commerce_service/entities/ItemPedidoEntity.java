@@ -5,26 +5,36 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.math.BigDecimal;
+
 @Data
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(name = "carrito")
-public class CarritoEntity {
-
+@Table(name = "items_pedido")
+public class ItemPedidoEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private Long usuarioId; // Solo se guarda el ID del usuario, no se relaciona como entidad
+    @ManyToOne
+    @JoinColumn(name = "pedido_id", nullable = false)
+    private PedidoEntity pedido;
 
     @ManyToOne
-    @JoinColumn(name = "producto_id")
+    @JoinColumn(name = "producto_id", nullable = false)
     private ProductoEntity producto;
-
-    private Integer cantidad;
 
     @ManyToOne
     @JoinColumn(name = "opcion_seleccionada_id")
     private OpcionProductoEntity opcionSeleccionada;
+
+    @Column(nullable = false)
+    private Integer cantidad;
+
+    @Column(nullable = false)
+    private BigDecimal precioUnitario;
+
+    @Column(nullable = false)
+    private BigDecimal descuentoPorcentaje;
 }

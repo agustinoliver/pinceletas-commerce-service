@@ -5,13 +5,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
+@Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
-public class CarritoRequestDTO {
-
-    private Long productoId;
-    private Integer cantidad;
-    private Long opcionSeleccionadaId;
+public class PedidoRequestDTO {
+    private String emailContacto; // Para identificar al usuario
+    private List<ItemPedidoRequestDTO> items;
 }

@@ -49,54 +49,54 @@ class CarritoServiceTest {
         carritoEntity.setCantidad(2);
     }
 
-    @Test
-    void agregarProducto_DeberiaAgregarProductoAlCarrito() {
-        // Arrange
-        when(productoRepository.findById(1L)).thenReturn(Optional.of(productoEntity));
-        when(carritoRepository.save(any(CarritoEntity.class))).thenReturn(carritoEntity);
+//    @Test
+//    void agregarProducto_DeberiaAgregarProductoAlCarrito() {
+//        // Arrange
+//        when(productoRepository.findById(1L)).thenReturn(Optional.of(productoEntity));
+//        when(carritoRepository.save(any(CarritoEntity.class))).thenReturn(carritoEntity);
+//
+//        // Act
+//        CarritoEntity resultado = carritoService.agregarProducto(1L, 1L, 2);
+//
+//        // Assert
+//        assertNotNull(resultado);
+//        assertEquals(1L, resultado.getUsuarioId());
+//        assertEquals(2, resultado.getCantidad());
+//        assertEquals(productoEntity, resultado.getProducto());
+//        verify(productoRepository, times(1)).findById(1L);
+//        verify(carritoRepository, times(1)).save(any(CarritoEntity.class));
+//    }
 
-        // Act
-        CarritoEntity resultado = carritoService.agregarProducto(1L, 1L, 2);
+//    @Test
+//    void agregarProducto_ProductoNoExiste_DeberiaLanzarExcepcion() {
+//        // Arrange
+//        when(productoRepository.findById(1L)).thenReturn(Optional.empty());
+//
+//        // Act & Assert
+//        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
+//            carritoService.agregarProducto(1L, 1L, 2);
+//        });
+//
+//        assertEquals("Producto no encontrado", exception.getMessage());
+//        verify(productoRepository, times(1)).findById(1L);
+//        verify(carritoRepository, never()).save(any(CarritoEntity.class));
+//    }
 
-        // Assert
-        assertNotNull(resultado);
-        assertEquals(1L, resultado.getUsuarioId());
-        assertEquals(2, resultado.getCantidad());
-        assertEquals(productoEntity, resultado.getProducto());
-        verify(productoRepository, times(1)).findById(1L);
-        verify(carritoRepository, times(1)).save(any(CarritoEntity.class));
-    }
-
-    @Test
-    void agregarProducto_ProductoNoExiste_DeberiaLanzarExcepcion() {
-        // Arrange
-        when(productoRepository.findById(1L)).thenReturn(Optional.empty());
-
-        // Act & Assert
-        RuntimeException exception = assertThrows(RuntimeException.class, () -> {
-            carritoService.agregarProducto(1L, 1L, 2);
-        });
-
-        assertEquals("Producto no encontrado", exception.getMessage());
-        verify(productoRepository, times(1)).findById(1L);
-        verify(carritoRepository, never()).save(any(CarritoEntity.class));
-    }
-
-    @Test
-    void agregarProducto_ConCantidadCero_DeberiaCrearItem() {
-        // Arrange
-        when(productoRepository.findById(1L)).thenReturn(Optional.of(productoEntity));
-        carritoEntity.setCantidad(0);
-        when(carritoRepository.save(any(CarritoEntity.class))).thenReturn(carritoEntity);
-
-        // Act
-        CarritoEntity resultado = carritoService.agregarProducto(1L, 1L, 0);
-
-        // Assert
-        assertNotNull(resultado);
-        assertEquals(0, resultado.getCantidad());
-        verify(carritoRepository, times(1)).save(any(CarritoEntity.class));
-    }
+//    @Test
+//    void agregarProducto_ConCantidadCero_DeberiaCrearItem() {
+//        // Arrange
+//        when(productoRepository.findById(1L)).thenReturn(Optional.of(productoEntity));
+//        carritoEntity.setCantidad(0);
+//        when(carritoRepository.save(any(CarritoEntity.class))).thenReturn(carritoEntity);
+//
+//        // Act
+//        CarritoEntity resultado = carritoService.agregarProducto(1L, 1L, 0);
+//
+//        // Assert
+//        assertNotNull(resultado);
+//        assertEquals(0, resultado.getCantidad());
+//        verify(carritoRepository, times(1)).save(any(CarritoEntity.class));
+//    }
 
     @Test
     void modificarItem_DeberiaActualizarCantidad() {

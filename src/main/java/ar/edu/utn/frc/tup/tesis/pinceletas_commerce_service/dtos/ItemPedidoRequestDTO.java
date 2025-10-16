@@ -5,13 +5,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+@Data
 @AllArgsConstructor
 @NoArgsConstructor
-@Data
 @Builder
-public class CarritoRequestDTO {
-
+public class ItemPedidoRequestDTO {
     private Long productoId;
-    private Integer cantidad;
     private Long opcionSeleccionadaId;
+    private Integer cantidad;
 }

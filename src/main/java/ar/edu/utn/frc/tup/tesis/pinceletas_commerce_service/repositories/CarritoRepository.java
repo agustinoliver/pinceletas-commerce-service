@@ -10,4 +10,10 @@ import java.util.List;
 public interface CarritoRepository extends JpaRepository<CarritoEntity, Long> {
     List<CarritoEntity> findByUsuarioId(Long usuarioId);
 
+    // ✅ NUEVO: Método para verificar si ya existe un producto con opción específica
+    boolean existsByUsuarioIdAndProductoIdAndOpcionSeleccionadaId(Long usuarioId, Long productoId, Long opcionSeleccionadaId);
+
+    // ✅ NUEVO: Método para productos sin opción
+    boolean existsByUsuarioIdAndProductoIdAndOpcionSeleccionadaIsNull(Long usuarioId, Long productoId);
+
 }

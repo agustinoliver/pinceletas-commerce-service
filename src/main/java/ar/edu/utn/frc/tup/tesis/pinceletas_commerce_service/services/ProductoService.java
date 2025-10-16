@@ -16,6 +16,7 @@ import org.modelmapper.ModelMapper;
 
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -49,6 +50,12 @@ public class ProductoService {
         producto.setDescripcion(dto.getDescripcion());
         producto.setPrecio(dto.getPrecio());
         producto.setActivo(dto.getActivo());
+        if (dto.getDescuentoPorcentaje() != null) {
+            validarDescuento(dto.getDescuentoPorcentaje());
+            producto.setDescuentoPorcentaje(dto.getDescuentoPorcentaje());
+        } else {
+            producto.setDescuentoPorcentaje(BigDecimal.ZERO);
+        }
         producto.setCategoria(categoria);
 
         if (imagenFile != null && !imagenFile.isEmpty()) {
@@ -92,6 +99,11 @@ public class ProductoService {
         original.setImagen(dto.getImagen());
         original.setActivo(dto.getActivo());
 
+        if (dto.getDescuentoPorcentaje() != null) {
+            validarDescuento(dto.getDescuentoPorcentaje());
+            original.setDescuentoPorcentaje(dto.getDescuentoPorcentaje());
+        }
+
         // Actualizar categoría
         if (dto.getCategoriaId() != null) {
             CategoriaEntity categoria = categoriaRepository.findById(dto.getCategoriaId())
@@ -126,6 +138,11 @@ public class ProductoService {
         original.setDescripcion(dto.getDescripcion());
         original.setPrecio(dto.getPrecio());
         original.setActivo(dto.getActivo());
+
+        if (dto.getDescuentoPorcentaje() != null) {
+            validarDescuento(dto.getDescuentoPorcentaje());
+            original.setDescuentoPorcentaje(dto.getDescuentoPorcentaje());
+        }
 
         // Actualizar imagen si se proporciona
         if (imagenFile != null && !imagenFile.isEmpty()) {
@@ -199,6 +216,7 @@ public class ProductoService {
         dto.setPrecio(entity.getPrecio());
         dto.setImagen(entity.getImagen());
         dto.setActivo(entity.getActivo());
+        dto.setDescuentoPorcentaje(entity.getDescuentoPorcentaje());
 
         if (entity.getCategoria() != null) {
             dto.setCategoriaId(entity.getCategoria().getId());
@@ -212,6 +230,11 @@ public class ProductoService {
         }
 
         return dto;
+    }
+    private void validarDescuento(BigDecimal descuento) {
+        if (descuento.compareTo(BigDecimal.ZERO) < 0 || descuento.compareTo(new BigDecimal(100)) > 0) {
+            throw new IllegalArgumentException("El descuento debe estar entre 0 y 100");
+        }
     }
 
     // ---------------------- AUDITORÍA ----------------------
@@ -248,6 +271,7 @@ public class ProductoService {
             data.put("precio", producto.getPrecio());
             data.put("imagen", producto.getImagen());
             data.put("activo", producto.getActivo());
+            data.put("descuentoPorcentaje", producto.getDescuentoPorcentaje());
 
             if (producto.getCategoria() != null) {
                 data.put("categoriaId", producto.getCategoria().getId());
