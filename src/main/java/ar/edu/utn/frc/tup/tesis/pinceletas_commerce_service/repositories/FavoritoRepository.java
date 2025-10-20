@@ -11,4 +11,7 @@ public interface FavoritoRepository extends JpaRepository<FavoritoEntity, Long> 
     List<FavoritoEntity> findByUsuarioId(Long usuarioId);
     boolean existsByUsuarioIdAndProductoId(Long usuarioId, Long productoId);
     void deleteByUsuarioIdAndProductoId(Long usuarioId, Long productoId);
+
+    // 🔔 NUEVO: Obtener todos los favoritos de un producto específico
+    List<FavoritoEntity> findByProductoId(Long productoId);
 }
