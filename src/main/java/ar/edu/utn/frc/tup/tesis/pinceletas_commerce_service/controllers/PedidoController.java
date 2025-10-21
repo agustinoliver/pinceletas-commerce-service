@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.controllers;
 
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.*;
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.entities.AuditoriaPedidoEntity;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.services.JwtExtractorService;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.services.PedidoService;
 import lombok.RequiredArgsConstructor;
@@ -109,5 +110,16 @@ public class PedidoController {
             // Retornar OK aunque sea error para que MP no reintente
             return ResponseEntity.ok().build();
         }
+    }
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/auditoria")
+    public ResponseEntity<List<AuditoriaPedidoEntity>> obtenerAuditoriaPedidos() {
+        return ResponseEntity.ok(pedidoService.consultarAuditoriaPedidos());
+    }
+
+    @PreAuthorize("hasRole('ADMIN')")
+    @GetMapping("/{pedidoId}/auditoria")
+    public ResponseEntity<List<AuditoriaPedidoEntity>> obtenerAuditoriaPorPedido(@PathVariable Long pedidoId) {
+        return ResponseEntity.ok(pedidoService.consultarAuditoriaPorPedido(pedidoId));
     }
 }

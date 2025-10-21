@@ -4,18 +4,22 @@ import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.Rabbit.NotificacionE
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.configs.UserAuthClient;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.*;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.entities.*;
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.enums.AccionAuditoria;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.enums.EstadoPedido;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.repositories.*;
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.exceptions.DireccionIncompletaException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.modelmapper.ModelMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.exceptions.DireccionIncompletaException;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -32,29 +36,26 @@ public class PedidoService {
     private final MercadoPagoService mercadoPagoService;
     private final UserAuthClient userAuthClient;
     private final ModelMapper modelMapper;
-
-    // 🔔 NUEVO: Inyectar el servicio de notificaciones
     private final NotificacionEventService notificacionEventService;
+
+    // 🔔 NUEVO: Repositorio de auditoría
+    private final AuditoriaPedidoRepository auditoriaPedidoRepository;
 
     @Transactional
     public PedidoResponseDTO crearPedido(PedidoRequestDTO pedidoRequest, String authToken) {
         log.info("Iniciando creación de pedido");
 
-        // Obtener datos del usuario desde user-auth-service
         UserResponseDTO usuario = userAuthClient.obtenerUsuarioPorEmail(
                 obtenerEmailUsuarioDesdeRequest(pedidoRequest),
                 authToken
         );
         log.info("Usuario obtenido: {}", usuario.getEmail());
 
-        // Validar que el usuario tenga dirección completa
         validarDireccionUsuario(usuario);
 
-        // Calcular total del pedido
         BigDecimal total = calcularTotalPedido(pedidoRequest.getItems());
         log.info("Total del pedido calculado: {}", total);
 
-        // Crear entidad de pedido
         PedidoEntity pedido = new PedidoEntity();
         pedido.setNumeroPedido(generarNumeroPedido());
         pedido.setUsuarioId(usuario.getId());
@@ -67,7 +68,6 @@ public class PedidoService {
                 pedidoRequest.getTipoEntrega() != null ? pedidoRequest.getTipoEntrega() : "envio"
         );
 
-        // Guardar snapshot de los datos de envío y contacto
         if ("envio".equals(pedido.getTipoEntrega())) {
             pedido.setDireccionEnvio(construirDireccionCompleta(usuario));
             pedido.setCiudadEnvio(usuario.getCiudad());
@@ -75,7 +75,6 @@ public class PedidoService {
             pedido.setCodigoPostalEnvio(usuario.getCodigoPostal());
             pedido.setPaisEnvio(usuario.getPais());
         } else {
-            // Para retiro en local, guardar los datos del local
             pedido.setDireccionEnvio("Barrio Nuevo Jardin, M77 L68");
             pedido.setCiudadEnvio("Córdoba");
             pedido.setProvinciaEnvio("Córdoba");
@@ -85,15 +84,15 @@ public class PedidoService {
         pedido.setEmailContacto(usuario.getEmail());
         pedido.setTelefonoContacto(usuario.getTelefono());
 
-        // Guardar pedido en BD
         PedidoEntity pedidoGuardado = pedidoRepository.save(pedido);
         log.info("Pedido guardado: {}", pedidoGuardado.getNumeroPedido());
 
-        // Crear items del pedido
         List<ItemPedidoEntity> items = crearItemsPedido(pedidoGuardado, pedidoRequest.getItems());
         pedidoGuardado.setItems(items);
 
-        // Crear preferencia de pago en Mercado Pago
+        // 🔔 AUDITORÍA: Registrar creación del pedido
+        registrarAuditoria(null, pedidoGuardado, AccionAuditoria.CREAR, usuario.getId());
+
         try {
             MercadoPagoResponseDTO mpResponse = mercadoPagoService.crearPreferenciaPago(pedidoGuardado);
             pedidoGuardado.setPreferenciaIdMp(mpResponse.getId());
@@ -101,7 +100,6 @@ public class PedidoService {
 
             PedidoEntity pedidoActualizado = pedidoRepository.save(pedidoGuardado);
 
-            // 🔔 NUEVO: Enviar notificación al ADMIN sobre el nuevo pedido
             try {
                 String detallesPedido = construirDetallesPedido(items);
                 notificacionEventService.enviarNotificacionNuevoPedido(
@@ -132,13 +130,23 @@ public class PedidoService {
         log.info("Actualizando estado del pedido {} de {} a {}",
                 pedido.getNumeroPedido(), pedido.getEstado(), actualizarEstadoDTO.getEstado());
 
+        // 🔔 AUDITORÍA: Guardar estado anterior
+        PedidoEntity pedidoAnterior = new PedidoEntity();
+        modelMapper.map(pedido, pedidoAnterior);
+
         EstadoPedido estadoAnterior = pedido.getEstado();
         pedido.setEstado(actualizarEstadoDTO.getEstado());
         pedido.setFechaActualizacion(LocalDateTime.now());
 
         PedidoEntity pedidoActualizado = pedidoRepository.save(pedido);
 
-        // 🔔 NUEVO: Notificar al USER sobre el cambio de estado
+        // 🔔 AUDITORÍA: Registrar modificación (el usuario que hace el cambio viene del token)
+        UserResponseDTO usuarioAdmin = userAuthClient.obtenerUsuarioPorEmail(
+                pedidoActualizado.getEmailContacto(),
+                authToken
+        );
+        registrarAuditoria(pedidoAnterior, pedidoActualizado, AccionAuditoria.MODIFICAR, usuarioAdmin.getId());
+
         if (!estadoAnterior.equals(actualizarEstadoDTO.getEstado())) {
             try {
                 UserResponseDTO usuario = userAuthClient.obtenerUsuarioPorEmail(
@@ -163,7 +171,6 @@ public class PedidoService {
         return mapToPedidoResponseDTO(pedidoActualizado);
     }
 
-    // 🔔 NUEVO: Método auxiliar para construir detalles del pedido
     private String construirDetallesPedido(List<ItemPedidoEntity> items) {
         if (items.isEmpty()) {
             return "Sin items.";
@@ -199,7 +206,6 @@ public class PedidoService {
         StringBuilder camposFaltantes = new StringBuilder();
         boolean direccionIncompleta = false;
 
-        // ✅ VALIDAR DIRECCIÓN: Debe tener (calle + número) O (manzana + lote)
         boolean tieneCalleNumero = (usuario.getCalle() != null && !usuario.getCalle().trim().isEmpty())
                 && (usuario.getNumero() != null && !usuario.getNumero().trim().isEmpty());
 
@@ -211,32 +217,27 @@ public class PedidoService {
             direccionIncompleta = true;
         }
 
-        // ✅ VALIDAR CIUDAD (obligatorio)
         if (usuario.getCiudad() == null || usuario.getCiudad().trim().isEmpty()) {
             camposFaltantes.append("ciudad, ");
             direccionIncompleta = true;
         }
 
-        // ✅ VALIDAR PROVINCIA (obligatorio)
         if (usuario.getProvincia() == null || usuario.getProvincia().trim().isEmpty()) {
             camposFaltantes.append("provincia, ");
             direccionIncompleta = true;
         }
 
-        // ✅ VALIDAR PAÍS (obligatorio)
         if (usuario.getPais() == null || usuario.getPais().trim().isEmpty()) {
             camposFaltantes.append("país, ");
             direccionIncompleta = true;
         }
 
-        // ✅ VALIDAR CÓDIGO POSTAL (obligatorio)
         if (usuario.getCodigoPostal() == null || usuario.getCodigoPostal().trim().isEmpty()) {
             camposFaltantes.append("código postal, ");
             direccionIncompleta = true;
         }
 
         if (direccionIncompleta) {
-            // Eliminar la última coma y espacio si existe
             String mensaje = camposFaltantes.toString();
             if (mensaje.endsWith(", ")) {
                 mensaje = mensaje.substring(0, mensaje.length() - 2);
@@ -245,7 +246,6 @@ public class PedidoService {
             log.warn("Usuario {} intenta crear pedido sin dirección completa. Campos faltantes: {}",
                     usuario.getEmail(), mensaje);
 
-            // Lanzar la excepción personalizada con mensaje detallado
             throw new DireccionIncompletaException(
                     "El usuario no tiene una dirección completa registrada. Complete su perfil antes de realizar un pedido. " +
                             "Campos faltantes: " + mensaje
@@ -258,30 +258,25 @@ public class PedidoService {
     private String construirDireccionCompleta(UserResponseDTO usuario) {
         StringBuilder direccion = new StringBuilder();
 
-        // ✅ PRIORIZAR CALLE + NÚMERO si están disponibles
         if (usuario.getCalle() != null && !usuario.getCalle().trim().isEmpty() &&
                 usuario.getNumero() != null && !usuario.getNumero().trim().isEmpty()) {
 
             direccion.append(usuario.getCalle()).append(" ").append(usuario.getNumero());
 
-            // Agregar piso si existe
             if (usuario.getPiso() != null && !usuario.getPiso().trim().isEmpty()) {
                 direccion.append(", Piso ").append(usuario.getPiso());
             }
 
-            // Agregar barrio si existe
             if (usuario.getBarrio() != null && !usuario.getBarrio().trim().isEmpty()) {
                 direccion.append(", ").append(usuario.getBarrio());
             }
         }
-        // ✅ SI NO, USAR MANZANA + LOTE
         else if (usuario.getManzana() != null && !usuario.getManzana().trim().isEmpty() &&
                 usuario.getLote() != null && !usuario.getLote().trim().isEmpty()) {
 
             direccion.append("Manzana ").append(usuario.getManzana())
                     .append(", Lote ").append(usuario.getLote());
 
-            // Agregar barrio si existe
             if (usuario.getBarrio() != null && !usuario.getBarrio().trim().isEmpty()) {
                 direccion.append(", ").append(usuario.getBarrio());
             }
@@ -364,6 +359,10 @@ public class PedidoService {
         PedidoEntity pedido = pedidoRepository.findByPreferenciaIdMp(preferenciaId)
                 .orElseThrow(() -> new RuntimeException("Pedido no encontrado para preferencia: " + preferenciaId));
 
+        // 🔔 AUDITORÍA: Guardar estado anterior antes del webhook
+        PedidoEntity pedidoAnterior = new PedidoEntity();
+        modelMapper.map(pedido, pedidoAnterior);
+
         pedido.setPagoIdMp(pagoId);
         pedido.setEstadoPagoMp(estadoPago);
         pedido.setFechaActualizacion(LocalDateTime.now());
@@ -387,7 +386,20 @@ public class PedidoService {
                 pedido.setEstado(EstadoPedido.PENDIENTE_PAGO);
         }
 
-        pedidoRepository.save(pedido);
+        PedidoEntity pedidoActualizado = pedidoRepository.save(pedido);
+
+        // 🔔 AUDITORÍA: Registrar cambio por webhook (usuarioId = sistema)
+        registrarAuditoria(pedidoAnterior, pedidoActualizado, AccionAuditoria.MODIFICAR, 0L); // 0L = sistema
+    }
+
+    // 🔔 NUEVO: Consultar auditoría de pedidos
+    public List<AuditoriaPedidoEntity> consultarAuditoriaPedidos() {
+        return auditoriaPedidoRepository.findAll();
+    }
+
+    // 🔔 NUEVO: Consultar auditoría de un pedido específico
+    public List<AuditoriaPedidoEntity> consultarAuditoriaPorPedido(Long pedidoId) {
+        return auditoriaPedidoRepository.findByPedidoId(pedidoId);
     }
 
     private void limpiarCarrito(Long usuarioId) {
@@ -438,5 +450,81 @@ public class PedidoService {
         dto.setSubtotal(precioConDescuento.multiply(BigDecimal.valueOf(item.getCantidad())));
 
         return dto;
+    }
+
+    // ---------------------- AUDITORÍA ----------------------
+
+    /**
+     * Registra una acción de auditoría para pedidos
+     */
+    private void registrarAuditoria(PedidoEntity anterior, PedidoEntity nuevo, AccionAuditoria accion, Long usuarioId) {
+        AuditoriaPedidoEntity auditoria = new AuditoriaPedidoEntity();
+
+        Long pedidoId = (nuevo != null) ? nuevo.getId() : (anterior != null ? anterior.getId() : null);
+        if (pedidoId == null) {
+            throw new IllegalStateException("No se puede auditar un pedido sin ID");
+        }
+
+        auditoria.setPedidoId(pedidoId);
+        auditoria.setAccion(accion);
+        auditoria.setUsuarioId(usuarioId);
+        auditoria.setFechaAccion(LocalDateTime.now());
+
+        auditoria.setValoresAnteriores(anterior != null ? serializarPedido(anterior) : null);
+        auditoria.setValoresNuevos(nuevo != null ? serializarPedido(nuevo) : null);
+
+        auditoriaPedidoRepository.save(auditoria);
+        log.info("Auditoría de pedido registrada: acción={}, pedidoId={}, usuarioId={}",
+                accion, pedidoId, usuarioId);
+    }
+
+    /**
+     * Serializa un pedido a JSON para auditoría (evita lazy loading)
+     */
+    private String serializarPedido(PedidoEntity pedido) {
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            mapper.findAndRegisterModules(); // Para LocalDateTime
+
+            Map<String, Object> data = new HashMap<>();
+            data.put("id", pedido.getId());
+            data.put("numeroPedido", pedido.getNumeroPedido());
+            data.put("usuarioId", pedido.getUsuarioId());
+            data.put("total", pedido.getTotal());
+            data.put("estado", pedido.getEstado());
+            data.put("fechaCreacion", pedido.getFechaCreacion());
+            data.put("fechaActualizacion", pedido.getFechaActualizacion());
+            data.put("tipoEntrega", pedido.getTipoEntrega());
+            data.put("direccionEnvio", pedido.getDireccionEnvio());
+            data.put("ciudadEnvio", pedido.getCiudadEnvio());
+            data.put("provinciaEnvio", pedido.getProvinciaEnvio());
+            data.put("codigoPostalEnvio", pedido.getCodigoPostalEnvio());
+            data.put("paisEnvio", pedido.getPaisEnvio());
+            data.put("emailContacto", pedido.getEmailContacto());
+            data.put("telefonoContacto", pedido.getTelefonoContacto());
+            data.put("preferenciaIdMp", pedido.getPreferenciaIdMp());
+            data.put("pagoIdMp", pedido.getPagoIdMp());
+            data.put("estadoPagoMp", pedido.getEstadoPagoMp());
+            data.put("fechaPagoMp", pedido.getFechaPagoMp());
+
+            // Incluir resumen de items (solo IDs y cantidades)
+            if (pedido.getItems() != null && !pedido.getItems().isEmpty()) {
+                List<Map<String, Object>> itemsResumen = pedido.getItems().stream()
+                        .map(item -> {
+                            Map<String, Object> itemData = new HashMap<>();
+                            itemData.put("productoId", item.getProducto().getId());
+                            itemData.put("cantidad", item.getCantidad());
+                            itemData.put("precioUnitario", item.getPrecioUnitario());
+                            return itemData;
+                        })
+                        .collect(Collectors.toList());
+                data.put("items", itemsResumen);
+            }
+
+            return mapper.writeValueAsString(data);
+        } catch (Exception e) {
+            log.error("Error serializando pedido para auditoría: {}", e.getMessage());
+            return "{}";
+        }
     }
 }
