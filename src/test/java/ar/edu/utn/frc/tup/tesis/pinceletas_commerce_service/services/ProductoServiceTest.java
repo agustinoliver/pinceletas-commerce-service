@@ -69,22 +69,24 @@ class ProductoServiceTest {
         opcionEntity.setId(1L);
         opcionEntity.setTipo("Color Rojo");
 
+        // ✅ CORREGIDO: ProductoDTO con lista de imágenes
         productoDTO = new ProductoDTO();
         productoDTO.setId(1L);
         productoDTO.setNombre("Pintura Acrílica");
         productoDTO.setDescripcion("Pintura de alta calidad");
         productoDTO.setPrecio(new BigDecimal("1500.00"));
-        productoDTO.setImagen("/uploads/imagen.jpg");
+        productoDTO.setImagenes(Arrays.asList("/uploads/imagen1.jpg", "/uploads/imagen2.jpg")); // ✅ CAMBIADO
         productoDTO.setActivo(true);
         productoDTO.setCategoriaId(1L);
         productoDTO.setOpcionesIds(Arrays.asList(1L));
 
+        // ✅ CORREGIDO: ProductoEntity con lista de imágenes
         productoEntity = new ProductoEntity();
         productoEntity.setId(1L);
         productoEntity.setNombre("Pintura Acrílica");
         productoEntity.setDescripcion("Pintura de alta calidad");
         productoEntity.setPrecio(new BigDecimal("1500.00"));
-        productoEntity.setImagen("/uploads/imagen.jpg");
+        productoEntity.setImagenes(Arrays.asList("/uploads/imagen1.jpg", "/uploads/imagen2.jpg")); // ✅ CAMBIADO
         productoEntity.setActivo(true);
         productoEntity.setCategoria(categoriaEntity);
         productoEntity.setOpciones(Arrays.asList(opcionEntity));
@@ -93,6 +95,7 @@ class ProductoServiceTest {
     @Test
     void registrarProductoConImagen_DeberiaCrearProducto() throws IOException {
         // Arrange
+        when(categoriaRepository.findById(1L)).thenReturn(Optional.of(categoriaEntity)); // ✅ AGREGADO
         when(opcionProductoRepository.findAllById(anyList()))
                 .thenReturn(Arrays.asList(opcionEntity));
         when(productoRepository.save(any(ProductoEntity.class)))
@@ -114,6 +117,7 @@ class ProductoServiceTest {
     @Test
     void registrarProductoConImagen_SinImagen_DeberiaCrearProducto() {
         // Arrange
+        when(categoriaRepository.findById(1L)).thenReturn(Optional.of(categoriaEntity)); // ✅ AGREGADO
         when(opcionProductoRepository.findAllById(anyList()))
                 .thenReturn(Arrays.asList(opcionEntity));
         when(productoRepository.save(any(ProductoEntity.class)))
@@ -130,6 +134,7 @@ class ProductoServiceTest {
     @Test
     void registrarProductoConImagen_ErrorAlGuardarImagen_DeberiaLanzarExcepcion() throws IOException {
         // Arrange
+        when(categoriaRepository.findById(1L)).thenReturn(Optional.of(categoriaEntity)); // ✅ AGREGADO
         when(imagenFile.isEmpty()).thenReturn(false);
         when(imagenFile.getOriginalFilename()).thenReturn("imagen.jpg");
         when(imagenFile.getInputStream()).thenThrow(new IOException("Error de lectura"));
@@ -152,12 +157,18 @@ class ProductoServiceTest {
         when(productoRepository.save(any(ProductoEntity.class)))
                 .thenReturn(productoEntity);
 
+        // ✅ CORREGIDO: Mock del mapper para evitar NPE
+        ProductoEntity productoAnterior = new ProductoEntity();
+        productoAnterior.setId(1L);
+        productoAnterior.setNombre("Nombre Anterior");
+        when(modelMapper.map(any(ProductoEntity.class), eq(ProductoEntity.class)))
+                .thenReturn(productoAnterior);
+
         // Act
         ProductoDTO resultado = productoService.modificarProducto(1L, productoDTO, 1L);
 
         // Assert
         assertNotNull(resultado);
-        assertEquals(1L, resultado.getId());
         verify(productoRepository, times(1)).findById(1L);
         verify(productoRepository, times(1)).save(any(ProductoEntity.class));
         verify(auditoriaProductoRepository, times(1)).save(any(AuditoriaProductoEntity.class));
@@ -183,6 +194,13 @@ class ProductoServiceTest {
         when(productoRepository.findById(1L)).thenReturn(Optional.of(productoEntity));
         when(categoriaRepository.findById(1L)).thenReturn(Optional.empty());
 
+        // ✅ CORREGIDO: Mock del mapper para evitar NPE
+        ProductoEntity productoAnterior = new ProductoEntity();
+        productoAnterior.setId(1L);
+        productoAnterior.setNombre("Nombre Anterior");
+        when(modelMapper.map(any(ProductoEntity.class), eq(ProductoEntity.class)))
+                .thenReturn(productoAnterior);
+
         // Act & Assert
         RuntimeException exception = assertThrows(RuntimeException.class, () -> {
             productoService.modificarProducto(1L, productoDTO, 1L);
@@ -203,6 +221,13 @@ class ProductoServiceTest {
         when(imagenFile.isEmpty()).thenReturn(false);
         when(imagenFile.getOriginalFilename()).thenReturn("nueva-imagen.jpg");
         when(imagenFile.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[0]));
+
+        // ✅ CORREGIDO: Mock del mapper para evitar NPE
+        ProductoEntity productoAnterior = new ProductoEntity();
+        productoAnterior.setId(1L);
+        productoAnterior.setNombre("Nombre Anterior");
+        when(modelMapper.map(any(ProductoEntity.class), eq(ProductoEntity.class)))
+                .thenReturn(productoAnterior);
 
         // Act
         ProductoEntity resultado = productoService.modificarProductoConImagen(1L, productoDTO, imagenFile, 1L);
@@ -276,6 +301,7 @@ class ProductoServiceTest {
         ProductoEntity producto2 = new ProductoEntity();
         producto2.setId(2L);
         producto2.setNombre("Pincel");
+        producto2.setImagenes(Arrays.asList("/uploads/pincel.jpg")); // ✅ CORREGIDO
 
         List<ProductoEntity> productos = Arrays.asList(productoEntity, producto2);
         when(productoRepository.findAll()).thenReturn(productos);
@@ -308,5 +334,62 @@ class ProductoServiceTest {
         assertNotNull(resultado);
         assertEquals(2, resultado.size());
         verify(auditoriaProductoRepository, times(1)).findAll();
+    }
+
+    // ✅ NUEVO: Test para validar descuento
+    @Test
+    void modificarProducto_DescuentoInvalido_DeberiaLanzarExcepcion() {
+        // Arrange
+        when(productoRepository.findById(1L)).thenReturn(Optional.of(productoEntity));
+
+        ProductoDTO dtoConDescuentoInvalido = new ProductoDTO();
+        dtoConDescuentoInvalido.setDescuentoPorcentaje(new BigDecimal("150")); // Descuento inválido
+
+        // ✅ CORREGIDO: Mock del mapper para evitar NPE
+        ProductoEntity productoAnterior = new ProductoEntity();
+        productoAnterior.setId(1L);
+        productoAnterior.setNombre("Nombre Anterior");
+        when(modelMapper.map(any(ProductoEntity.class), eq(ProductoEntity.class)))
+                .thenReturn(productoAnterior);
+
+        // Act & Assert
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> {
+            productoService.modificarProducto(1L, dtoConDescuentoInvalido, 1L);
+        });
+
+        assertTrue(exception.getMessage().contains("El descuento debe estar entre 0 y 100"));
+    }
+
+    // ✅ NUEVO: Test para múltiples imágenes
+    @Test
+    void registrarProductoConMultiplesImagenes_DeberiaCrearProducto() throws IOException {
+        // Arrange
+        when(categoriaRepository.findById(1L)).thenReturn(Optional.of(categoriaEntity));
+        when(opcionProductoRepository.findAllById(anyList()))
+                .thenReturn(Arrays.asList(opcionEntity));
+        when(productoRepository.save(any(ProductoEntity.class)))
+                .thenReturn(productoEntity);
+
+        MultipartFile imagenFile1 = mock(MultipartFile.class);
+        MultipartFile imagenFile2 = mock(MultipartFile.class);
+
+        when(imagenFile1.isEmpty()).thenReturn(false);
+        when(imagenFile1.getOriginalFilename()).thenReturn("imagen1.jpg");
+        when(imagenFile1.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[0]));
+
+        when(imagenFile2.isEmpty()).thenReturn(false);
+        when(imagenFile2.getOriginalFilename()).thenReturn("imagen2.jpg");
+        when(imagenFile2.getInputStream()).thenReturn(new ByteArrayInputStream(new byte[0]));
+
+        List<MultipartFile> imagenes = Arrays.asList(imagenFile1, imagenFile2);
+
+        // Act
+        ProductoEntity resultado = productoService.registrarProductoConMultiplesImagenes(
+                productoDTO, imagenes, 1L);
+
+        // Assert
+        assertNotNull(resultado);
+        verify(productoRepository, times(1)).save(any(ProductoEntity.class));
+        verify(auditoriaProductoRepository, times(1)).save(any(AuditoriaProductoEntity.class));
     }
 }

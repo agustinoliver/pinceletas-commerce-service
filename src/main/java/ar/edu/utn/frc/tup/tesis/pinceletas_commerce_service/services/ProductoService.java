@@ -20,6 +20,7 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -58,16 +59,22 @@ public class ProductoService {
         }
         producto.setCategoria(categoria);
 
+        // ✅ CORREGIDO: Guardar como lista de imágenes
         if (imagenFile != null && !imagenFile.isEmpty()) {
             try {
                 String uploadsDir = "uploads/";
                 String originalFilename = imagenFile.getOriginalFilename();
-                Path filePath = Paths.get(uploadsDir + originalFilename);
+                String timestamp = System.currentTimeMillis() + "_";
+                String nombreArchivo = timestamp + originalFilename;
+                Path filePath = Paths.get(uploadsDir + nombreArchivo);
 
                 Files.createDirectories(filePath.getParent());
                 Files.copy(imagenFile.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-                producto.setImagen("/uploads/" + originalFilename);
+                // ✅ CORREGIDO: Crear lista con una sola imagen
+                List<String> imagenes = new ArrayList<>();
+                imagenes.add("/uploads/" + nombreArchivo);
+                producto.setImagenes(imagenes);
             } catch (IOException e) {
                 throw new RuntimeException("Error al guardar imagen", e);
             }
@@ -90,31 +97,29 @@ public class ProductoService {
                 .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
 
         ProductoEntity anterior = new ProductoEntity();
-        modelMapper.map(original, anterior); // copia para auditoría
+        modelMapper.map(original, anterior);
 
-        // 🔔 DETECTAR SI ENTRA EN DESCUENTO (antes no tenía, ahora sí)
         boolean entraEnDescuento = detectarSiEntraEnDescuento(anterior, dto);
 
-        // Modificamos manualmente los campos que vienen del DTO
         original.setNombre(dto.getNombre());
         original.setDescripcion(dto.getDescripcion());
         original.setPrecio(dto.getPrecio());
-        original.setImagen(dto.getImagen());
         original.setActivo(dto.getActivo());
+
+        // ✅ CORREGIDO: Actualizar lista de imágenes desde el DTO
+        original.setImagenes(dto.getImagenes());
 
         if (dto.getDescuentoPorcentaje() != null) {
             validarDescuento(dto.getDescuentoPorcentaje());
             original.setDescuentoPorcentaje(dto.getDescuentoPorcentaje());
         }
 
-        // Actualizar categoría
         if (dto.getCategoriaId() != null) {
             CategoriaEntity categoria = categoriaRepository.findById(dto.getCategoriaId())
                     .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
             original.setCategoria(categoria);
         }
 
-        // ✅ Actualizar opciones (ManyToMany: se setea la lista completa)
         if (dto.getOpcionesIds() != null) {
             List<OpcionProductoEntity> nuevasOpciones = opcionProductoRepository.findAllById(dto.getOpcionesIds());
             original.setOpciones(nuevasOpciones);
@@ -125,7 +130,6 @@ public class ProductoService {
         ProductoEntity saved = productoRepository.save(original);
         registrarAuditoria(anterior, saved, AccionAuditoria.MODIFICAR, usuarioId);
 
-        // 🔔 SI ENTRA EN DESCUENTO, NOTIFICAR A USUARIOS CON FAVORITO
         if (entraEnDescuento) {
             notificarDescuentoAFavoritos(saved);
         }
@@ -140,12 +144,10 @@ public class ProductoService {
                 .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
 
         ProductoEntity anterior = new ProductoEntity();
-        modelMapper.map(original, anterior); // copia para auditoría
+        modelMapper.map(original, anterior);
 
-        // 🔔 DETECTAR SI ENTRA EN DESCUENTO
         boolean entraEnDescuento = detectarSiEntraEnDescuento(anterior, dto);
 
-        // Modificamos manualmente los campos que vienen del DTO
         original.setNombre(dto.getNombre());
         original.setDescripcion(dto.getDescripcion());
         original.setPrecio(dto.getPrecio());
@@ -156,30 +158,33 @@ public class ProductoService {
             original.setDescuentoPorcentaje(dto.getDescuentoPorcentaje());
         }
 
-        // Actualizar imagen si se proporciona
+        // ✅ CORREGIDO: Actualizar imagen como lista
         if (imagenFile != null && !imagenFile.isEmpty()) {
             try {
                 String uploadsDir = "uploads/";
                 String originalFilename = imagenFile.getOriginalFilename();
-                Path filePath = Paths.get(uploadsDir + originalFilename);
+                String timestamp = System.currentTimeMillis() + "_";
+                String nombreArchivo = timestamp + originalFilename;
+                Path filePath = Paths.get(uploadsDir + nombreArchivo);
 
                 Files.createDirectories(filePath.getParent());
                 Files.copy(imagenFile.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
 
-                original.setImagen("/uploads/" + originalFilename);
+                // ✅ CORREGIDO: Reemplazar todas las imágenes por la nueva
+                List<String> nuevaImagen = new ArrayList<>();
+                nuevaImagen.add("/uploads/" + nombreArchivo);
+                original.setImagenes(nuevaImagen);
             } catch (IOException e) {
                 throw new RuntimeException("Error al guardar imagen", e);
             }
         }
 
-        // Actualizar categoría
         if (dto.getCategoriaId() != null) {
             CategoriaEntity categoria = categoriaRepository.findById(dto.getCategoriaId())
                     .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
             original.setCategoria(categoria);
         }
 
-        // ✅ Actualizar opciones (ManyToMany: se setea la lista completa)
         if (dto.getOpcionesIds() != null) {
             List<OpcionProductoEntity> nuevasOpciones = opcionProductoRepository.findAllById(dto.getOpcionesIds());
             original.setOpciones(nuevasOpciones);
@@ -190,12 +195,169 @@ public class ProductoService {
         ProductoEntity saved = productoRepository.save(original);
         registrarAuditoria(anterior, saved, AccionAuditoria.MODIFICAR, usuarioId);
 
-        // 🔔 SI ENTRA EN DESCUENTO, NOTIFICAR A USUARIOS CON FAVORITO
         if (entraEnDescuento) {
             notificarDescuentoAFavoritos(saved);
         }
 
         return saved;
+    }
+    // ProductoService.java - Agregar estos métodos
+
+    /**
+     * Registra un producto con múltiples imágenes
+     */
+    public ProductoEntity registrarProductoConMultiplesImagenes(
+            ProductoDTO dto, List<MultipartFile> imagenesFiles, Long usuarioId) {
+
+        CategoriaEntity categoria = categoriaRepository.findById(dto.getCategoriaId())
+                .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
+
+        ProductoEntity producto = new ProductoEntity();
+        producto.setNombre(dto.getNombre());
+        producto.setDescripcion(dto.getDescripcion());
+        producto.setPrecio(dto.getPrecio());
+        producto.setActivo(dto.getActivo());
+        producto.setCategoria(categoria);
+        producto.setDescuentoPorcentaje(dto.getDescuentoPorcentaje() != null ?
+                dto.getDescuentoPorcentaje() : BigDecimal.ZERO);
+
+        // ✅ Procesar múltiples imágenes
+        if (imagenesFiles != null && !imagenesFiles.isEmpty()) {
+            List<String> rutasImagenes = guardarImagenes(imagenesFiles);
+            producto.setImagenes(rutasImagenes);
+        }
+
+        // Procesar opciones
+        if (dto.getOpcionesIds() != null && !dto.getOpcionesIds().isEmpty()) {
+            List<OpcionProductoEntity> opciones = opcionProductoRepository.findAllById(dto.getOpcionesIds());
+            producto.setOpciones(opciones);
+        }
+
+        ProductoEntity saved = productoRepository.save(producto);
+        registrarAuditoria(null, saved, AccionAuditoria.CREAR, usuarioId);
+        return saved;
+    }
+
+    /**
+     * Modifica un producto con múltiples imágenes
+     */
+    public ProductoEntity modificarProductoConMultiplesImagenes(
+            Long id, ProductoDTO dto, List<MultipartFile> imagenesFiles,
+            Boolean mantenerImagenes, Long usuarioId) {
+
+        ProductoEntity original = productoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
+
+        ProductoEntity anterior = new ProductoEntity();
+        modelMapper.map(original, anterior);
+
+        boolean entraEnDescuento = detectarSiEntraEnDescuento(anterior, dto);
+
+        // Actualizar campos básicos
+        original.setNombre(dto.getNombre());
+        original.setDescripcion(dto.getDescripcion());
+        original.setPrecio(dto.getPrecio());
+        original.setActivo(dto.getActivo());
+
+        if (dto.getDescuentoPorcentaje() != null) {
+            validarDescuento(dto.getDescuentoPorcentaje());
+            original.setDescuentoPorcentaje(dto.getDescuentoPorcentaje());
+        }
+
+        // Actualizar categoría
+        if (dto.getCategoriaId() != null) {
+            CategoriaEntity categoria = categoriaRepository.findById(dto.getCategoriaId())
+                    .orElseThrow(() -> new RuntimeException("Categoría no encontrada"));
+            original.setCategoria(categoria);
+        }
+
+        // ✅ Actualizar imágenes
+        if (imagenesFiles != null && !imagenesFiles.isEmpty()) {
+            List<String> nuevasImagenes = guardarImagenes(imagenesFiles);
+
+            if (mantenerImagenes && original.getImagenes() != null) {
+                // Agregar las nuevas imágenes a las existentes
+                List<String> imagenesActuales = new ArrayList<>(original.getImagenes());
+                imagenesActuales.addAll(nuevasImagenes);
+                original.setImagenes(imagenesActuales);
+            } else {
+                // Reemplazar todas las imágenes
+                original.setImagenes(nuevasImagenes);
+            }
+        }
+
+        // Actualizar opciones
+        if (dto.getOpcionesIds() != null) {
+            List<OpcionProductoEntity> nuevasOpciones = opcionProductoRepository.findAllById(dto.getOpcionesIds());
+            original.setOpciones(nuevasOpciones);
+        }
+
+        ProductoEntity saved = productoRepository.save(original);
+        registrarAuditoria(anterior, saved, AccionAuditoria.MODIFICAR, usuarioId);
+
+        if (entraEnDescuento) {
+            notificarDescuentoAFavoritos(saved);
+        }
+
+        return saved;
+    }
+
+    /**
+     * Guarda múltiples imágenes y retorna sus rutas
+     */
+    private List<String> guardarImagenes(List<MultipartFile> imagenes) {
+        List<String> rutasImagenes = new ArrayList<>();
+        String uploadsDir = "uploads/";
+
+        try {
+            // Limitar a 5 imágenes máximo
+            int maxImagenes = Math.min(imagenes.size(), 5);
+
+            for (int i = 0; i < maxImagenes; i++) {
+                MultipartFile imagen = imagenes.get(i);
+                if (imagen != null && !imagen.isEmpty()) {
+                    String nombreOriginal = imagen.getOriginalFilename();
+                    String timestamp = System.currentTimeMillis() + "_";
+                    String nombreArchivo = timestamp + nombreOriginal;
+
+                    Path filePath = Paths.get(uploadsDir + nombreArchivo);
+                    Files.createDirectories(filePath.getParent());
+                    Files.copy(imagen.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+                    rutasImagenes.add("/uploads/" + nombreArchivo);
+                }
+            }
+        } catch (IOException e) {
+            log.error("Error al guardar imágenes: {}", e.getMessage());
+            throw new RuntimeException("Error al guardar imágenes", e);
+        }
+
+        return rutasImagenes;
+    }
+
+    /**
+     * Elimina una imagen específica de un producto
+     */
+    public void eliminarImagenDeProducto(Long productoId, int indiceImagen, Long usuarioId) {
+        ProductoEntity producto = productoRepository.findById(productoId)
+                .orElseThrow(() -> new RuntimeException("Producto no encontrado"));
+
+        if (producto.getImagenes() == null || producto.getImagenes().isEmpty()) {
+            throw new RuntimeException("El producto no tiene imágenes");
+        }
+
+        if (indiceImagen < 0 || indiceImagen >= producto.getImagenes().size()) {
+            throw new RuntimeException("Índice de imagen inválido");
+        }
+
+        ProductoEntity anterior = new ProductoEntity();
+        modelMapper.map(producto, anterior);
+
+        // Eliminar la imagen
+        producto.getImagenes().remove(indiceImagen);
+
+        ProductoEntity saved = productoRepository.save(producto);
+        registrarAuditoria(anterior, saved, AccionAuditoria.MODIFICAR, usuarioId);
     }
 
     // ---------------------- ELIMINAR PRODUCTO ----------------------
@@ -228,11 +390,11 @@ public class ProductoService {
 
     private ProductoDTO mapToDto(ProductoEntity entity) {
         ProductoDTO dto = new ProductoDTO();
-        dto.setId(entity.getId()); // ESTA LÍNEA ES FUNDAMENTAL
+        dto.setId(entity.getId());
         dto.setNombre(entity.getNombre());
         dto.setDescripcion(entity.getDescripcion());
         dto.setPrecio(entity.getPrecio());
-        dto.setImagen(entity.getImagen());
+        dto.setImagenes(entity.getImagenes()); // ✅ CORREGIDO: de setImagen a setImagenes
         dto.setActivo(entity.getActivo());
         dto.setDescuentoPorcentaje(entity.getDescuentoPorcentaje());
 
@@ -281,13 +443,12 @@ public class ProductoService {
         try {
             ObjectMapper mapper = new ObjectMapper();
 
-            // Crear un DTO plano
             var data = new java.util.HashMap<String, Object>();
             data.put("id", producto.getId());
             data.put("nombre", producto.getNombre());
             data.put("descripcion", producto.getDescripcion());
             data.put("precio", producto.getPrecio());
-            data.put("imagen", producto.getImagen());
+            data.put("imagenes", producto.getImagenes()); // ✅ CORREGIDO: de imagen a imagenes
             data.put("activo", producto.getActivo());
             data.put("descuentoPorcentaje", producto.getDescuentoPorcentaje());
 
@@ -340,7 +501,6 @@ public class ProductoService {
      */
     private void notificarDescuentoAFavoritos(ProductoEntity producto) {
         try {
-            // Obtener todos los favoritos de este producto
             List<FavoritoEntity> favoritos = favoritoRepository.findByProductoId(producto.getId());
 
             if (favoritos.isEmpty()) {
@@ -350,19 +510,19 @@ public class ProductoService {
 
             log.info("📧 Enviando {} emails de descuento para producto: {}", favoritos.size(), producto.getNombre());
 
-            // Calcular precio con descuento
             BigDecimal precioConDescuento = calcularPrecioConDescuento(
                     producto.getPrecio(),
                     producto.getDescuentoPorcentaje()
             );
 
-            // Enviar email a cada usuario
             for (FavoritoEntity favorito : favoritos) {
                 try {
-                    // 🔔 ACTUALIZADO: Llamada directa a userAuthClient por ID
                     UserResponseDTO usuario = userAuthClient.obtenerUsuarioPorId(favorito.getUsuarioId());
 
                     if (usuario != null && usuario.getEmail() != null) {
+                        // ✅ CORREGIDO: Usar imagen principal en lugar de imagen única
+                        String imagenPrincipal = producto.getImagenPrincipal();
+
                         emailService.enviarEmailDescuentoFavorito(
                                 usuario.getEmail(),
                                 usuario.getNombre() + " " + usuario.getApellido(),
@@ -370,7 +530,7 @@ public class ProductoService {
                                 producto.getPrecio(),
                                 producto.getDescuentoPorcentaje(),
                                 precioConDescuento,
-                                producto.getImagen(),
+                                imagenPrincipal, // ✅ Usar imagen principal
                                 producto.getId()
                         );
 
@@ -378,7 +538,6 @@ public class ProductoService {
                     }
                 } catch (Exception e) {
                     log.error("❌ Error enviando email a usuario {}: {}", favorito.getUsuarioId(), e.getMessage());
-                    // Continuar con los demás usuarios aunque falle uno
                 }
             }
 
@@ -386,7 +545,6 @@ public class ProductoService {
 
         } catch (Exception e) {
             log.error("❌ Error general en notificación de descuentos: {}", e.getMessage(), e);
-            // No fallar la actualización del producto si falla el envío de emails
         }
     }
 

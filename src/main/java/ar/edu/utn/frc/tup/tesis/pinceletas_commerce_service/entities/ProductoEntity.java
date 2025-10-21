@@ -1,6 +1,7 @@
 package ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.entities;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -8,6 +9,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 @Data
@@ -28,7 +30,12 @@ public class ProductoEntity {
 
     private BigDecimal precio;
 
-    private String imagen;
+    // ✅ CAMBIO: Ya no es una sola imagen, ahora es una lista
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "producto_imagenes", joinColumns = @JoinColumn(name = "producto_id"))
+    @Column(name = "imagen_url")
+    @OrderColumn(name = "orden") // Mantiene el orden de las imágenes
+    private List<String> imagenes = new ArrayList<>();
 
     private Boolean activo;
 
@@ -48,4 +55,9 @@ public class ProductoEntity {
     )
     private List<OpcionProductoEntity> opciones;
 
+    // ✅ NUEVO: Método helper para obtener la primera imagen (imagen principal)
+    @JsonIgnore
+    public String getImagenPrincipal() {
+        return imagenes != null && !imagenes.isEmpty() ? imagenes.get(0) : null;
+    }
 }

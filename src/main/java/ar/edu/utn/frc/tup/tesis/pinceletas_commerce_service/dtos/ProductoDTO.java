@@ -18,7 +18,7 @@ public class ProductoDTO {
     private String nombre;
     private String descripcion;
     private BigDecimal precio;
-    private String imagen;
+    private List<String> imagenes; // ✅ CAMBIADO: de String imagen a List<String> imagenes
     private Boolean activo;
     private Long categoriaId;
     private List<Long> opcionesIds;

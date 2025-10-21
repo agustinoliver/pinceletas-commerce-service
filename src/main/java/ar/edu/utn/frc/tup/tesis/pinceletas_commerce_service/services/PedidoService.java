@@ -437,7 +437,7 @@ public class PedidoService {
 
         dto.setProductoId(item.getProducto().getId());
         dto.setNombreProducto(item.getProducto().getNombre());
-        dto.setImagenProducto(item.getProducto().getImagen());
+        dto.setImagenProducto(obtenerImagenPrincipal(item.getProducto()));
 
         if (item.getOpcionSeleccionada() != null) {
             dto.setOpcionSeleccionadaId(item.getOpcionSeleccionada().getId());
@@ -450,6 +450,12 @@ public class PedidoService {
         dto.setSubtotal(precioConDescuento.multiply(BigDecimal.valueOf(item.getCantidad())));
 
         return dto;
+    }
+    private String obtenerImagenPrincipal(ProductoEntity producto) {
+        if (producto.getImagenes() != null && !producto.getImagenes().isEmpty()) {
+            return producto.getImagenes().get(0); // Primera imagen como principal
+        }
+        return ""; // O null, dependiendo de tu lógica
     }
 
     // ---------------------- AUDITORÍA ----------------------
