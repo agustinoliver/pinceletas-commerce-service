@@ -38,6 +38,9 @@ public class PedidoEntity {
 
     private LocalDateTime fechaActualizacion;
 
+    @Column(nullable = false)
+    private String tipoEntrega;
+
     // Datos de envío (snapshot al momento del pedido)
     private String direccionEnvio;
     private String ciudadEnvio;

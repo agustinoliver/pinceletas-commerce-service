@@ -33,6 +33,8 @@ public class PedidoResponseDTO {
     private String emailContacto;
     private String telefonoContacto;
 
+    private String tipoEntrega;
+
     // Datos de Mercado Pago
     private String preferenciaIdMp;
     private String estadoPagoMp;

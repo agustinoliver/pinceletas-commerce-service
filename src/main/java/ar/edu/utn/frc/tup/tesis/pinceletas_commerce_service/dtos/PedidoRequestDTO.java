@@ -14,4 +14,5 @@ import java.util.List;
 public class PedidoRequestDTO {
     private String emailContacto; // Para identificar al usuario
     private List<ItemPedidoRequestDTO> items;
+    private String tipoEntrega;
 }
