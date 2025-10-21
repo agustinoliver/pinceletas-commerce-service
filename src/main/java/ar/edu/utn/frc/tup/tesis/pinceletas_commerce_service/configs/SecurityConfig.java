@@ -36,8 +36,10 @@ public class SecurityConfig {
                         .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
                         .requestMatchers("/health", "/actuator/health").permitAll()
 
-                        .requestMatchers("/productos/public/**").permitAll()
+                        // 🔥 CRÍTICO: Permitir acceso público a las imágenes
                         .requestMatchers("/uploads/**").permitAll()
+
+                        .requestMatchers("/productos/public/**").permitAll()
 
                         // ✅ 2. WEBHOOK DE MERCADO PAGO (MUY IMPORTANTE QUE ESTÉ ANTES)
                         .requestMatchers(HttpMethod.POST, "/pedidos/webhook").permitAll()
