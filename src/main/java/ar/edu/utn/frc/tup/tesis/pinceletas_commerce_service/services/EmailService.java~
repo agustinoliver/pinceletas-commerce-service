@@ -19,6 +19,8 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    private final ImageHostingService imageHostingService; // 🆕 NUEVO
+
     @Value("${app.mail.from:noreply@pinceletas.com}")
     private String fromEmail;
 
@@ -90,11 +92,27 @@ public class EmailService {
             Long productoId) {
 
         String urlProducto = "http://localhost:4200/productos/" + productoId;
+        // 🔥 CORRECCIÓN: Construcción correcta de la URL de la imagen
+        String urlImagen;
+        if (imagenProducto != null && !imagenProducto.isEmpty()) {
+            // Si la imagen ya tiene la ruta completa con /uploads/
+            if (imagenProducto.startsWith("/uploads/")) {
+                urlImagen = "http://localhost:8080" + imagenProducto;
+            }
+            // Si solo tiene el nombre del archivo
+            else if (imagenProducto.startsWith("uploads/")) {
+                urlImagen = "http://localhost:8080/" + imagenProducto;
+            }
+            // Si es solo el nombre del archivo sin ruta
+            else {
+                urlImagen = "http://localhost:8080/uploads/" + imagenProducto;
+            }
 
-        // CORREGIDO: Usar el método mejorado para construir la URL de la imagen
-        String urlImagen = construirUrlImagen(imagenProducto);
-
-        log.info("🔍 URL de imagen generada para email: {}", urlImagen);
+            log.info("🖼️ URL de imagen construida: {}", urlImagen);
+        } else {
+            urlImagen = "https://via.placeholder.com/300x200?text=Producto";
+            log.warn("⚠️ No hay imagen de producto, usando placeholder");
+        }
 
         return String.format("""
             <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; padding: 30px;">
@@ -185,48 +203,4 @@ public class EmailService {
                 urlProducto
         );
     }
-
-    /**
-     * Construye la URL completa de la imagen
-     */
-    private String construirUrlImagen(String imagenProducto) {
-        if (imagenProducto == null || imagenProducto.isEmpty()) {
-            return "https://via.placeholder.com/300x200?text=Producto";
-        }
-
-        // Extraer solo el nombre del archivo (por si viene con ruta completa)
-        String nombreArchivo = extraerNombreArchivo(imagenProducto);
-
-        // Codificar espacios y caracteres especiales en la URL
-        String nombreCodificado = codificarNombreArchivo(nombreArchivo);
-
-        return "http://localhost:8080/uploads/" + nombreCodificado;
-    }
-
-    /**
-     * Extrae solo el nombre del archivo de una ruta completa
-     */
-    private String extraerNombreArchivo(String rutaCompleta) {
-        if (rutaCompleta.contains("/")) {
-            return rutaCompleta.substring(rutaCompleta.lastIndexOf("/") + 1);
-        }
-        if (rutaCompleta.contains("\\")) {
-            return rutaCompleta.substring(rutaCompleta.lastIndexOf("\\") + 1);
-        }
-        return rutaCompleta;
-    }
-
-    /**
-     * Codifica el nombre del archivo para URL (espacios, caracteres especiales)
-     */
-    private String codificarNombreArchivo(String nombreArchivo) {
-        try {
-            // Reemplazar espacios por %20 y otros caracteres problemáticos
-            return nombreArchivo.replace(" ", "%20");
-        } catch (Exception e) {
-            log.warn("Error codificando nombre de archivo: {}", nombreArchivo);
-            return nombreArchivo;
-        }
-    }
 }
-

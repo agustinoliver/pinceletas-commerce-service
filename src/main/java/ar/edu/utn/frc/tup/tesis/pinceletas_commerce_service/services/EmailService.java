@@ -19,6 +19,8 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
+    private final ImageHostingService imageHostingService; // 🆕 NUEVO
+
     @Value("${app.mail.from:noreply@pinceletas.com}")
     private String fromEmail;
 
@@ -90,9 +92,9 @@ public class EmailService {
             Long productoId) {
 
         String urlProducto = "http://localhost:4200/productos/" + productoId;
-        String urlImagen = imagenProducto != null && !imagenProducto.isEmpty()
-                ? "http://localhost:8080" + imagenProducto
-                : "https://via.placeholder.com/300x200?text=Producto";
+        // 🔥 CORRECCIÓN: Construcción correcta de la URL de la imagen
+        String urlImagen = imageHostingService.getPublicImageUrl(imagenProducto);
+        log.info("🖼️ URL pública de imagen para email: {}", urlImagen);
 
         return String.format("""
             <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f8f9fa; padding: 30px;">
