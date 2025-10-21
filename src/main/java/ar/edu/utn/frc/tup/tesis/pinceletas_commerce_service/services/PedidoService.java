@@ -1,5 +1,6 @@
 package ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.services;
 
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.Rabbit.NotificacionEventService;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.configs.UserAuthClient;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.*;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.entities.*;
@@ -22,6 +23,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class PedidoService {
+
     private final PedidoRepository pedidoRepository;
     private final ItemPedidoRepository itemPedidoRepository;
     private final ProductoRepository productoRepository;
@@ -30,6 +32,9 @@ public class PedidoService {
     private final MercadoPagoService mercadoPagoService;
     private final UserAuthClient userAuthClient;
     private final ModelMapper modelMapper;
+
+    // 🔔 NUEVO: Inyectar el servicio de notificaciones
+    private final NotificacionEventService notificacionEventService;
 
     @Transactional
     public PedidoResponseDTO crearPedido(PedidoRequestDTO pedidoRequest, String authToken) {
@@ -45,11 +50,11 @@ public class PedidoService {
         // Validar que el usuario tenga dirección completa
         validarDireccionUsuario(usuario);
 
-        // Validar productos y calcular total
+        // Calcular total del pedido
         BigDecimal total = calcularTotalPedido(pedidoRequest.getItems());
         log.info("Total del pedido calculado: {}", total);
 
-        // Crear pedido
+        // Crear entidad de pedido
         PedidoEntity pedido = new PedidoEntity();
         pedido.setNumeroPedido(generarNumeroPedido());
         pedido.setUsuarioId(usuario.getId());
@@ -80,7 +85,7 @@ public class PedidoService {
         pedido.setEmailContacto(usuario.getEmail());
         pedido.setTelefonoContacto(usuario.getTelefono());
 
-        // Guardar pedido primero (sin items ni preferencia MP)
+        // Guardar pedido en BD
         PedidoEntity pedidoGuardado = pedidoRepository.save(pedido);
         log.info("Pedido guardado: {}", pedidoGuardado.getNumeroPedido());
 
@@ -95,13 +100,90 @@ public class PedidoService {
             log.info("Preferencia de Mercado Pago creada: {}", mpResponse.getId());
 
             PedidoEntity pedidoActualizado = pedidoRepository.save(pedidoGuardado);
+
+            // 🔔 NUEVO: Enviar notificación al ADMIN sobre el nuevo pedido
+            try {
+                String detallesPedido = construirDetallesPedido(items);
+                notificacionEventService.enviarNotificacionNuevoPedido(
+                        usuario.getEmail(),
+                        pedidoActualizado.getNumeroPedido(),
+                        detallesPedido,
+                        usuario.getId(),
+                        usuario.getNombre() + " " + usuario.getApellido()
+                );
+                log.info("Notificación de nuevo pedido enviada al ADMIN");
+            } catch (Exception ex) {
+                log.error("Error enviando notificación de nuevo pedido: {}", ex.getMessage());
+            }
+
             return mapToPedidoResponseDTO(pedidoActualizado, mpResponse);
         } catch (Exception e) {
             log.error("Error al crear preferencia de pago", e);
-            // Si falla Mercado Pago, eliminamos el pedido
             pedidoRepository.delete(pedidoGuardado);
             throw new RuntimeException("Error al crear preferencia de pago: " + e.getMessage());
         }
+    }
+
+    @Transactional
+    public PedidoResponseDTO actualizarEstadoPedido(Long id, ActualizarEstadoPedidoDTO actualizarEstadoDTO, String authToken) {
+        PedidoEntity pedido = pedidoRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Pedido no encontrado: " + id));
+
+        log.info("Actualizando estado del pedido {} de {} a {}",
+                pedido.getNumeroPedido(), pedido.getEstado(), actualizarEstadoDTO.getEstado());
+
+        EstadoPedido estadoAnterior = pedido.getEstado();
+        pedido.setEstado(actualizarEstadoDTO.getEstado());
+        pedido.setFechaActualizacion(LocalDateTime.now());
+
+        PedidoEntity pedidoActualizado = pedidoRepository.save(pedido);
+
+        // 🔔 NUEVO: Notificar al USER sobre el cambio de estado
+        if (!estadoAnterior.equals(actualizarEstadoDTO.getEstado())) {
+            try {
+                UserResponseDTO usuario = userAuthClient.obtenerUsuarioPorEmail(
+                        pedidoActualizado.getEmailContacto(),
+                        authToken
+                );
+
+                notificacionEventService.enviarNotificacionEstadoPedido(
+                        usuario.getEmail(),
+                        usuario.getId(),
+                        pedidoActualizado.getNumeroPedido(),
+                        actualizarEstadoDTO.getEstado().name(),
+                        usuario.getNombre() + " " + usuario.getApellido()
+                );
+
+                log.info("Notificación de cambio de estado enviada a usuario {}", usuario.getEmail());
+            } catch (Exception e) {
+                log.error("Error enviando notificación de cambio de estado: {}", e.getMessage());
+            }
+        }
+
+        return mapToPedidoResponseDTO(pedidoActualizado);
+    }
+
+    // 🔔 NUEVO: Método auxiliar para construir detalles del pedido
+    private String construirDetallesPedido(List<ItemPedidoEntity> items) {
+        if (items.isEmpty()) {
+            return "Sin items.";
+        }
+
+        StringBuilder detalles = new StringBuilder("Productos: ");
+        for (int i = 0; i < Math.min(items.size(), 3); i++) {
+            ItemPedidoEntity item = items.get(i);
+            detalles.append(item.getProducto().getNombre())
+                    .append(" (x").append(item.getCantidad()).append(")");
+            if (i < Math.min(items.size(), 3) - 1) {
+                detalles.append(", ");
+            }
+        }
+
+        if (items.size() > 3) {
+            detalles.append(" y ").append(items.size() - 3).append(" más");
+        }
+
+        return detalles.toString();
     }
 
     private String obtenerEmailUsuarioDesdeRequest(PedidoRequestDTO pedidoRequest) {
@@ -276,20 +358,6 @@ public class PedidoService {
     }
 
     @Transactional
-    public PedidoResponseDTO actualizarEstadoPedido(Long id, ActualizarEstadoPedidoDTO actualizarEstadoDTO, String authToken) {
-        PedidoEntity pedido = pedidoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Pedido no encontrado: " + id));
-
-        log.info("Actualizando estado del pedido {} de {} a {}", pedido.getNumeroPedido(), pedido.getEstado(), actualizarEstadoDTO.getEstado());
-
-        pedido.setEstado(actualizarEstadoDTO.getEstado());
-        pedido.setFechaActualizacion(LocalDateTime.now());
-
-        PedidoEntity pedidoActualizado = pedidoRepository.save(pedido);
-        return mapToPedidoResponseDTO(pedidoActualizado);
-    }
-
-    @Transactional
     public void procesarWebhook(String preferenciaId, String pagoId, String estadoPago) {
         log.info("Procesando webhook de Mercado Pago - Preferencia: {}, Estado: {}", preferenciaId, estadoPago);
 
@@ -300,7 +368,6 @@ public class PedidoService {
         pedido.setEstadoPagoMp(estadoPago);
         pedido.setFechaActualizacion(LocalDateTime.now());
 
-        // Actualizar estado del pedido según el estado del pago
         switch (estadoPago.toUpperCase()) {
             case "APPROVED":
                 pedido.setEstado(EstadoPedido.PAGADO);

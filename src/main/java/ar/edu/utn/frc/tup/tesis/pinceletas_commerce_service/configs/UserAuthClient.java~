@@ -45,12 +45,14 @@ public class UserAuthClient {private final RestTemplate restTemplate;
         }
     }
 
-    // ✅ UN SOLO MÉTODO obtenerUsuarioPorId CON UN SOLO PARÁMETRO
-    public UserResponseDTO obtenerUsuarioPorId(Long userId) {
+    public UserResponseDTO obtenerUsuarioPorId(Long userId, String token) {
         try {
             String url = userAuthServiceUrl + "/api/users/by-id/" + userId;
 
             HttpHeaders headers = new HttpHeaders();
+            if (token != null) {
+                headers.set("Authorization", "Bearer " + token);
+            }
             headers.setContentType(MediaType.APPLICATION_JSON);
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
@@ -81,6 +83,7 @@ public class UserAuthClient {private final RestTemplate restTemplate;
             throw new RuntimeException("Error al obtener datos del usuario: " + e.getMessage());
         }
     }
+
 
     public boolean validarToken(String token) {
         try {

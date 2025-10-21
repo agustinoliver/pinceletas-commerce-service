@@ -359,8 +359,11 @@ public class ProductoService {
             // Enviar email a cada usuario
             for (FavoritoEntity favorito : favoritos) {
                 try {
-                    // 🔔 ACTUALIZADO: Llamada directa a userAuthClient por ID
-                    UserResponseDTO usuario = userAuthClient.obtenerUsuarioPorId(favorito.getUsuarioId());
+                    // Obtener datos del usuario
+                    UserResponseDTO usuario = userAuthClient.obtenerUsuarioPorEmail(
+                            obtenerEmailPorUsuarioId(favorito.getUsuarioId()),
+                            null // No necesitamos token para consulta interna
+                    );
 
                     if (usuario != null && usuario.getEmail() != null) {
                         emailService.enviarEmailDescuentoFavorito(
