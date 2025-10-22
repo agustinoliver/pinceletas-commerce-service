@@ -106,8 +106,11 @@ public class ProductoService {
         original.setPrecio(dto.getPrecio());
         original.setActivo(dto.getActivo());
 
-        // ✅ CORREGIDO: Actualizar lista de imágenes desde el DTO
-        original.setImagenes(dto.getImagenes());
+        // ✅ CORREGIDO: Solo actualizar imágenes si vienen datos
+        if (dto.getImagenes() != null && !dto.getImagenes().isEmpty()) {
+            original.setImagenes(dto.getImagenes());
+        }
+        // Si dto.getImagenes() es null o vacío, mantener las imágenes existentes
 
         if (dto.getDescuentoPorcentaje() != null) {
             validarDescuento(dto.getDescuentoPorcentaje());
@@ -136,6 +139,7 @@ public class ProductoService {
 
         return mapToDto(saved);
     }
+
 
     // ---------------------- MODIFICAR PRODUCTO CON IMAGEN ----------------------
 
