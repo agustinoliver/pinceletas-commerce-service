@@ -33,10 +33,10 @@ public class PedidoService {
     private final ProductoRepository productoRepository;
     private final OpcionProductoRepository opcionProductoRepository;
     private final CarritoRepository carritoRepository;
-    private final MercadoPagoService mercadoPagoService;
     private final UserAuthClient userAuthClient;
     private final ModelMapper modelMapper;
     private final NotificacionEventService notificacionEventService;
+    private final MercadoPagoService mercadoPagoService;
 
     // 🔔 NUEVO: Repositorio de auditoría
     private final AuditoriaPedidoRepository auditoriaPedidoRepository;
@@ -63,7 +63,6 @@ public class PedidoService {
         pedido.setEstado(EstadoPedido.PENDIENTE_PAGO);
         pedido.setFechaCreacion(LocalDateTime.now());
         pedido.setFechaActualizacion(LocalDateTime.now());
-
         pedido.setTipoEntrega(
                 pedidoRequest.getTipoEntrega() != null ? pedidoRequest.getTipoEntrega() : "envio"
         );
@@ -81,6 +80,7 @@ public class PedidoService {
             pedido.setCodigoPostalEnvio("5000");
             pedido.setPaisEnvio("Argentina");
         }
+
         pedido.setEmailContacto(usuario.getEmail());
         pedido.setTelefonoContacto(usuario.getTelefono());
 
@@ -90,11 +90,12 @@ public class PedidoService {
         List<ItemPedidoEntity> items = crearItemsPedido(pedidoGuardado, pedidoRequest.getItems());
         pedidoGuardado.setItems(items);
 
-        // 🔔 AUDITORÍA: Registrar creación del pedido
         registrarAuditoria(null, pedidoGuardado, AccionAuditoria.CREAR, usuario.getId());
 
         try {
+            // ✅ RESTAURADO: Usar Mercado Pago
             MercadoPagoResponseDTO mpResponse = mercadoPagoService.crearPreferenciaPago(pedidoGuardado);
+
             pedidoGuardado.setPreferenciaIdMp(mpResponse.getId());
             log.info("Preferencia de Mercado Pago creada: {}", mpResponse.getId());
 
@@ -115,11 +116,19 @@ public class PedidoService {
             }
 
             return mapToPedidoResponseDTO(pedidoActualizado, mpResponse);
+
         } catch (Exception e) {
             log.error("Error al crear preferencia de pago", e);
             pedidoRepository.delete(pedidoGuardado);
             throw new RuntimeException("Error al crear preferencia de pago: " + e.getMessage());
         }
+    }
+
+    private PedidoResponseDTO mapToPedidoResponseDTO(PedidoEntity pedido, MercadoPagoResponseDTO mpResponse) {
+        PedidoResponseDTO dto = mapToPedidoResponseDTO(pedido);
+        dto.setInitPoint(mpResponse.getInitPoint());
+        dto.setSandboxInitPoint(mpResponse.getSandboxInitPoint());
+        return dto;
     }
 
     @Transactional
@@ -169,6 +178,44 @@ public class PedidoService {
         }
 
         return mapToPedidoResponseDTO(pedidoActualizado);
+    }
+    @Transactional
+    public void procesarWebhookVexor(String numeroPedido, String pagoId, String estadoPago) {
+        log.info("🔔 Procesando webhook de Vexor - Pedido: {}, Estado: {}", numeroPedido, estadoPago);
+
+        PedidoEntity pedido = pedidoRepository.findByNumeroPedido(numeroPedido)
+                .orElseThrow(() -> new RuntimeException("Pedido no encontrado: " + numeroPedido));
+
+        PedidoEntity pedidoAnterior = new PedidoEntity();
+        modelMapper.map(pedido, pedidoAnterior);
+
+        pedido.setPagoIdMp(pagoId); // Reutilizamos este campo
+        pedido.setEstadoPagoMp(estadoPago);
+        pedido.setFechaActualizacion(LocalDateTime.now());
+
+        switch (estadoPago.toLowerCase()) {
+            case "approved":
+            case "completed":
+                pedido.setEstado(EstadoPedido.PAGADO);
+                pedido.setFechaPagoMp(LocalDateTime.now());
+                limpiarCarrito(pedido.getUsuarioId());
+                log.info("✅ Pago aprobado para pedido {}", pedido.getNumeroPedido());
+                break;
+            case "rejected":
+            case "failed":
+                pedido.setEstado(EstadoPedido.CANCELADO);
+                log.info("❌ Pago rechazado para pedido {}", pedido.getNumeroPedido());
+                break;
+            case "pending":
+                pedido.setEstado(EstadoPedido.PENDIENTE);
+                log.info("⏳ Pago pendiente para pedido {}", pedido.getNumeroPedido());
+                break;
+            default:
+                pedido.setEstado(EstadoPedido.PENDIENTE_PAGO);
+        }
+
+        PedidoEntity pedidoActualizado = pedidoRepository.save(pedido);
+        registrarAuditoria(pedidoAnterior, pedidoActualizado, AccionAuditoria.MODIFICAR, 0L);
     }
 
     private String construirDetallesPedido(List<ItemPedidoEntity> items) {
@@ -359,7 +406,6 @@ public class PedidoService {
         PedidoEntity pedido = pedidoRepository.findByPreferenciaIdMp(preferenciaId)
                 .orElseThrow(() -> new RuntimeException("Pedido no encontrado para preferencia: " + preferenciaId));
 
-        // 🔔 AUDITORÍA: Guardar estado anterior antes del webhook
         PedidoEntity pedidoAnterior = new PedidoEntity();
         modelMapper.map(pedido, pedidoAnterior);
 
@@ -387,9 +433,7 @@ public class PedidoService {
         }
 
         PedidoEntity pedidoActualizado = pedidoRepository.save(pedido);
-
-        // 🔔 AUDITORÍA: Registrar cambio por webhook (usuarioId = sistema)
-        registrarAuditoria(pedidoAnterior, pedidoActualizado, AccionAuditoria.MODIFICAR, 0L); // 0L = sistema
+        registrarAuditoria(pedidoAnterior, pedidoActualizado, AccionAuditoria.MODIFICAR, 0L);
     }
 
     // 🔔 NUEVO: Consultar auditoría de pedidos
@@ -425,12 +469,7 @@ public class PedidoService {
         return dto;
     }
 
-    private PedidoResponseDTO mapToPedidoResponseDTO(PedidoEntity pedido, MercadoPagoResponseDTO mpResponse) {
-        PedidoResponseDTO dto = mapToPedidoResponseDTO(pedido);
-        dto.setInitPoint(mpResponse.getInitPoint());
-        dto.setSandboxInitPoint(mpResponse.getSandboxInitPoint());
-        return dto;
-    }
+
 
     private ItemPedidoResponseDTO mapToItemPedidoResponseDTO(ItemPedidoEntity item) {
         ItemPedidoResponseDTO dto = modelMapper.map(item, ItemPedidoResponseDTO.class);

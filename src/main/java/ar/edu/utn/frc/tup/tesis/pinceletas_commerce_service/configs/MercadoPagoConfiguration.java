@@ -8,7 +8,6 @@ import jakarta.annotation.PostConstruct;
 
 @Configuration
 public class MercadoPagoConfiguration {
-
     @Value("${mercadopago.access-token}")
     private String accessToken;
 
@@ -16,7 +15,7 @@ public class MercadoPagoConfiguration {
     public void init() {
         try {
             MercadoPagoConfig.setAccessToken(accessToken);
-            System.out.println("✅ Mercado Pago configurado correctamente con token: " + accessToken.substring(0, 10) + "...");
+            System.out.println("✅ Mercado Pago configurado correctamente");
         } catch (Exception e) {
             System.err.println("❌ Error configurando Mercado Pago: " + e.getMessage());
             e.printStackTrace();

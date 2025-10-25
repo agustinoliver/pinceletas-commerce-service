@@ -38,23 +38,15 @@ public class MercadoPagoService {
     @Value("${mercadopago.pending-url:http://localhost:4200/payment/pending}")
     private String pendingUrl;
 
-    // ✅ NUEVO: Inicializar el SDK de Mercado Pago
     @PostConstruct
     public void init() {
         MercadoPagoConfig.setAccessToken(accessToken);
         log.info("✅ Mercado Pago inicializado correctamente");
-        log.info("   - Access Token: {}...", accessToken.substring(0, 20));
     }
 
     public MercadoPagoResponseDTO crearPreferenciaPago(PedidoEntity pedido) {
         try {
-            log.info("📦 Creando preferencia de pago:");
-            log.info("   - Pedido: {}", pedido.getNumeroPedido());
-            log.info("   - Total: {}", pedido.getTotal());
-            log.info("   - Success URL: {}", successUrl + "?pedido=" + pedido.getNumeroPedido());
-            log.info("   - Failure URL: {}", failureUrl + "?pedido=" + pedido.getNumeroPedido());
-            log.info("   - Pending URL: {}", pendingUrl + "?pedido=" + pedido.getNumeroPedido());
-            log.info("   - Webhook URL: {}", appUrl + "/pedidos/webhook");
+            log.info("📦 Creando preferencia de pago para pedido: {}", pedido.getNumeroPedido());
 
             PreferenceClient client = new PreferenceClient();
 
@@ -76,22 +68,23 @@ public class MercadoPagoService {
 
             // URLs de redirección
             PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
-                    .success(successUrl + "?pedido=" + pedido.getNumeroPedido())
-                    .failure(failureUrl + "?pedido=" + pedido.getNumeroPedido())
-                    .pending(pendingUrl + "?pedido=" + pedido.getNumeroPedido())
+                    .success(successUrl)
+                    .failure(failureUrl)
+                    .pending(pendingUrl)
                     .build();
 
             PreferenceRequest request = PreferenceRequest.builder()
                     .items(items)
                     .backUrls(backUrls)
+                    .autoReturn("approved")
                     .externalReference(pedido.getNumeroPedido())
                     .notificationUrl(appUrl + "/pedidos/webhook")
+                    .binaryMode(true)
                     .build();
 
             Preference preference = client.create(request);
 
             log.info("✅ Preferencia de Mercado Pago creada: {}", preference.getId());
-            log.info("✅ Init Point: {}", preference.getInitPoint());
             log.info("✅ Sandbox Init Point: {}", preference.getSandboxInitPoint());
 
             return MercadoPagoResponseDTO.builder()
@@ -106,15 +99,6 @@ public class MercadoPagoService {
         } catch (MPException e) {
             log.error("❌ Error de Mercado Pago: {}", e.getMessage());
             throw new RuntimeException("Error al crear preferencia de pago: " + e.getMessage());
-        }
-    }
-
-    public void procesarPago(String paymentId) {
-        try {
-            log.info("Procesando pago con ID: {}", paymentId);
-        } catch (Exception e) {
-            log.error("Error al procesar pago: {}", e.getMessage());
-            throw new RuntimeException("Error al procesar pago");
         }
     }
 }

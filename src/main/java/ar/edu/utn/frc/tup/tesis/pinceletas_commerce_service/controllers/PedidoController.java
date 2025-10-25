@@ -12,6 +12,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/pedidos")
@@ -122,4 +123,6 @@ public class PedidoController {
     public ResponseEntity<List<AuditoriaPedidoEntity>> obtenerAuditoriaPorPedido(@PathVariable Long pedidoId) {
         return ResponseEntity.ok(pedidoService.consultarAuditoriaPorPedido(pedidoId));
     }
+
+
 }
