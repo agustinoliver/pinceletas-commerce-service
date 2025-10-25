@@ -41,7 +41,15 @@ public class SecurityConfig {
 
                         .requestMatchers("/productos/public/**").permitAll()
 
+
                         // ✅ WEBHOOK DE MERCADO PAGO (MUY IMPORTANTE)
+
+                        // 🔥 NUEVO: Permitir acceso público a los endpoints de reportes
+                        // para comunicación entre microservicios
+                        .requestMatchers(HttpMethod.GET, "/api/reports/**").permitAll()
+
+                        // ✅ 2. WEBHOOK DE MERCADO PAGO (MUY IMPORTANTE QUE ESTÉ ANTES)
+
                         .requestMatchers(HttpMethod.POST, "/pedidos/webhook").permitAll()
 
                         // Rutas específicas de pedidos primero
