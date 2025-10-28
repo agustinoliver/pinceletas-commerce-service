@@ -17,10 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -185,49 +182,40 @@ public class PedidoService {
     @Transactional
     public void procesarNotificacionMercadoPago(String paymentId) {
         try {
-            log.info("🔍 Consultando información del pago: {}", paymentId);
+            log.info("🔍 Procesando notificación de pago: {}", paymentId);
 
-            // Buscar pedido por pagoIdMp
-            List<PedidoEntity> pedidos = pedidoRepository.findAll().stream()
+            // OPCIÓN 1: Buscar por pagoIdMp
+            Optional<PedidoEntity> pedidoOpt = pedidoRepository.findAll().stream()
                     .filter(p -> paymentId.equals(p.getPagoIdMp()))
-                    .collect(Collectors.toList());
+                    .findFirst();
 
-            if (pedidos.isEmpty()) {
+            if (pedidoOpt.isEmpty()) {
                 log.warn("⚠️ No se encontró pedido con payment_id: {}", paymentId);
 
-                // Intentar buscar por estado pendiente reciente
-                log.info("🔍 Intentando buscar por estado pendiente reciente...");
-
-                // Buscar pedidos pendientes creados en los últimos 10 minutos
-                LocalDateTime hace10Min = LocalDateTime.now().minusMinutes(10);
+                // OPCIÓN 2: Buscar el pedido más reciente en estado PENDIENTE_PAGO
+                LocalDateTime hace30Min = LocalDateTime.now().minusMinutes(30);
                 List<PedidoEntity> pedidosPendientes = pedidoRepository.findAll().stream()
                         .filter(p -> p.getEstado() == EstadoPedido.PENDIENTE_PAGO)
-                        .filter(p -> p.getFechaCreacion().isAfter(hace10Min))
+                        .filter(p -> p.getFechaCreacion().isAfter(hace30Min))
+                        .sorted((p1, p2) -> p2.getFechaCreacion().compareTo(p1.getFechaCreacion()))
                         .collect(Collectors.toList());
 
                 if (pedidosPendientes.isEmpty()) {
-                    log.warn("⚠️ No se encontraron pedidos pendientes recientes");
+                    log.error("❌ No se encontraron pedidos pendientes recientes");
                     return;
                 }
 
-                // Tomar el más reciente
-                PedidoEntity pedido = pedidosPendientes.stream()
-                        .max((p1, p2) -> p1.getFechaCreacion().compareTo(p2.getFechaCreacion()))
-                        .orElse(null);
+                PedidoEntity pedido = pedidosPendientes.get(0);
+                log.info("✅ Encontrado pedido pendiente reciente: {}", pedido.getNumeroPedido());
 
-                if (pedido != null) {
-                    log.info("✅ Encontrado pedido pendiente: {}", pedido.getNumeroPedido());
-                    actualizarEstadoPago(pedido, paymentId, "approved");
-                }
-
+                // Actualizar con el payment ID
+                actualizarEstadoPago(pedido, paymentId, "approved");
                 return;
             }
 
-            // Actualizar el estado del pedido
-            PedidoEntity pedido = pedidos.get(0);
+            // Si encontramos el pedido directamente
+            PedidoEntity pedido = pedidoOpt.get();
             log.info("✅ Pedido encontrado: {}", pedido.getNumeroPedido());
-
-            // Por defecto asumimos que es aprobado (deberías consultar el estado real)
             actualizarEstadoPago(pedido, paymentId, "approved");
 
         } catch (Exception e) {
@@ -239,6 +227,8 @@ public class PedidoService {
      * Actualiza el estado de pago de un pedido
      */
     private void actualizarEstadoPago(PedidoEntity pedido, String paymentId, String estadoPago) {
+        log.info("📝 Actualizando estado de pago para pedido: {}", pedido.getNumeroPedido());
+
         PedidoEntity pedidoAnterior = new PedidoEntity();
         modelMapper.map(pedido, pedidoAnterior);
 
@@ -251,21 +241,31 @@ public class PedidoService {
             case "accredited":
                 pedido.setEstado(EstadoPedido.PAGADO);
                 pedido.setFechaPagoMp(LocalDateTime.now());
-                limpiarCarrito(pedido.getUsuarioId());
-                log.info("✅ Pago aprobado para pedido {}", pedido.getNumeroPedido());
+
+                // Limpiar carrito
+                try {
+                    limpiarCarrito(pedido.getUsuarioId());
+                    log.info("🧹 Carrito limpiado para usuario {}", pedido.getUsuarioId());
+                } catch (Exception e) {
+                    log.error("❌ Error limpiando carrito: {}", e.getMessage());
+                }
+
+                log.info("✅ Pago APROBADO para pedido {}", pedido.getNumeroPedido());
                 break;
+
             case "rejected":
             case "cancelled":
                 pedido.setEstado(EstadoPedido.CANCELADO);
-                log.info("❌ Pago rechazado para pedido {}", pedido.getNumeroPedido());
+                log.info("❌ Pago RECHAZADO/CANCELADO para pedido {}", pedido.getNumeroPedido());
                 break;
+
             case "pending":
             case "in_process":
                 pedido.setEstado(EstadoPedido.PENDIENTE);
-                log.info("⏳ Pago pendiente para pedido {}", pedido.getNumeroPedido());
+                log.info("⏳ Pago PENDIENTE para pedido {}", pedido.getNumeroPedido());
                 break;
+
             default:
-                pedido.setEstado(EstadoPedido.PENDIENTE_PAGO);
                 log.warn("⚠️ Estado desconocido: {}", estadoPago);
         }
 
@@ -274,6 +274,13 @@ public class PedidoService {
 
         log.info("💾 Estado del pedido actualizado: {} -> {}",
                 pedido.getNumeroPedido(), pedido.getEstado());
+
+        // Enviar notificación al usuario
+        try {
+            enviarNotificacionEstadoPago(pedidoActualizado);
+        } catch (Exception e) {
+            log.error("❌ Error enviando notificación: {}", e.getMessage());
+        }
     }
 
     private String construirDetallesPedido(List<ItemPedidoEntity> items) {
