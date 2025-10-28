@@ -45,19 +45,15 @@ public class MercadoPagoService {
         try {
             MercadoPagoConfig.setAccessToken(accessToken);
 
-            boolean isTestToken = accessToken.contains("APP_USR-") && accessToken.contains("TEST");
-
             log.info("✅ Mercado Pago inicializado correctamente");
-            log.info("🔑 Tipo de Access Token: {}", isTestToken ? "PRUEBA (TEST)" : "PRODUCCIÓN");
-            log.info("🌐 Modo configurado: {}", testMode ? "PRUEBA" : "PRODUCCIÓN");
+            log.info("🔑 Access Token configurado: {}...{}",
+                    accessToken.substring(0, 20),
+                    accessToken.substring(accessToken.length() - 10));
+            log.info("🌐 Modo configurado: {}", testMode ? "PRUEBA (Sandbox)" : "PRODUCCIÓN");
             log.info("🔔 Webhook URL: {}", webhookUrl);
             log.info("✅ Success URL: {}", successUrl);
             log.info("❌ Failure URL: {}", failureUrl);
             log.info("⏳ Pending URL: {}", pendingUrl);
-
-            if (isTestToken && !testMode) {
-                log.warn("⚠️ ADVERTENCIA: Estás usando un token de PRUEBA pero el modo está en PRODUCCIÓN");
-            }
 
         } catch (Exception e) {
             log.error("❌ Error configurando Mercado Pago: {}", e.getMessage());
@@ -69,6 +65,7 @@ public class MercadoPagoService {
         try {
             log.info("📦 Creando preferencia de pago para pedido: {}", pedido.getNumeroPedido());
             log.info("💰 Total del pedido: ${}", pedido.getTotal());
+            log.info("🧪 Modo: {}", testMode ? "SANDBOX (Prueba)" : "PRODUCCIÓN");
 
             PreferenceClient client = new PreferenceClient();
 
@@ -79,7 +76,7 @@ public class MercadoPagoService {
                     .id(pedido.getId().toString())
                     .title("Pedido #" + pedido.getNumeroPedido())
                     .description("Productos de arte y manualidades - Pinceletas")
-                    .pictureUrl("https://via.placeholder.com/300x200/ED620C/FFFFFF?text=Pinceletas")
+                    .pictureUrl("https://i.ibb.co/ZMt7LfQ/logo-pinceletas.png")
                     .categoryId("art")
                     .quantity(1)
                     .currencyId("ARS")
@@ -88,7 +85,7 @@ public class MercadoPagoService {
 
             items.add(item);
 
-            // ✅ URLs DE RETORNO (OBLIGATORIAS - TODAS DEBEN ESTAR DEFINIDAS)
+            // ✅ URLs DE RETORNO (OBLIGATORIAS)
             PreferenceBackUrlsRequest backUrls = PreferenceBackUrlsRequest.builder()
                     .success(successUrl)
                     .failure(failureUrl)
@@ -102,30 +99,36 @@ public class MercadoPagoService {
 
             // ✅ CONFIGURACIÓN DE MÉTODOS DE PAGO
             PreferencePaymentMethodsRequest paymentMethods = PreferencePaymentMethodsRequest.builder()
-                    .installments(12) // Máximo 12 cuotas
-                    .defaultInstallments(1) // Por defecto 1 cuota
+                    .installments(12)
+                    .defaultInstallments(1)
                     .build();
 
-            // ✅ INFORMACIÓN DEL PAGADOR (OPCIONAL PERO RECOMENDADO)
+            // ✅ INFORMACIÓN DEL PAGADOR
             PreferencePayerRequest payer = PreferencePayerRequest.builder()
                     .email(pedido.getEmailContacto())
                     .name(pedido.getEmailContacto().split("@")[0])
                     .build();
 
-            // ✅ CREAR LA PREFERENCIA SIN autoReturn
-            // IMPORTANTE: NO usar autoReturn para evitar el error
-            PreferenceRequest request = PreferenceRequest.builder()
+            // ✅ CREAR LA PREFERENCIA - CONFIGURACIÓN CORRECTA PARA SANDBOX
+            PreferenceRequest.PreferenceRequestBuilder requestBuilder = PreferenceRequest.builder()
                     .items(items)
                     .payer(payer)
                     .backUrls(backUrls)
-                    // ❌ NO USAR: .autoReturn("approved") - Esto causa el error
                     .paymentMethods(paymentMethods)
                     .notificationUrl(webhookUrl)
                     .externalReference(pedido.getNumeroPedido())
-                    .statementDescriptor("PINCELETAS")
-                    .expires(true) // La preferencia expirará
-                    .expirationDateTo(OffsetDateTime.now(ZoneOffset.UTC).plusDays(7)) // Expira en 7 días
-                    .build();
+                    .statementDescriptor("PINCELETAS");
+
+            // ✅ CRÍTICO: En modo sandbox, NO agregar expires ni autoReturn
+            // Esto evita el error de codificación UTF-8
+            if (!testMode) {
+                // Solo en producción agregar expiración
+                requestBuilder
+                        .expires(true)
+                        .expirationDateTo(OffsetDateTime.now(ZoneOffset.UTC).plusDays(7));
+            }
+
+            PreferenceRequest request = requestBuilder.build();
 
             log.info("📤 Enviando request a Mercado Pago...");
 
@@ -139,10 +142,13 @@ public class MercadoPagoService {
 
             // ✅ DETERMINAR QUÉ URL USAR SEGÚN EL MODO
             String urlPago = testMode ? preference.getSandboxInitPoint() : preference.getInitPoint();
-            log.info("🎯 URL de pago seleccionada ({}): {}", testMode ? "SANDBOX" : "PRODUCCIÓN", urlPago);
+            log.info("🎯 URL de pago seleccionada ({}): {}",
+                    testMode ? "SANDBOX" : "PRODUCCIÓN", urlPago);
 
             if (urlPago == null || urlPago.isEmpty()) {
                 log.error("❌ ERROR: La URL de pago está vacía");
+                log.error("InitPoint: {}", preference.getInitPoint());
+                log.error("SandboxInitPoint: {}", preference.getSandboxInitPoint());
                 throw new RuntimeException("No se pudo obtener la URL de pago de Mercado Pago");
             }
 
