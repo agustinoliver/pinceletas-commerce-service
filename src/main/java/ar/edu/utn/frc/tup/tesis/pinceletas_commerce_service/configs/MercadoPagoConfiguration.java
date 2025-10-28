@@ -11,6 +11,7 @@ public class MercadoPagoConfiguration {
     @Value("${mercadopago.access-token}")
     private String accessToken;
 
+
     @PostConstruct
     public void init() {
         try {

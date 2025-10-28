@@ -11,6 +11,8 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDateTime;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -96,21 +98,71 @@ public class PedidoController {
         return ResponseEntity.ok(pedido);
     }
 
+    /**
+     * ✅ WEBHOOK CORREGIDO - Recibe notificaciones de Mercado Pago
+     * Mercado Pago envía: topic, id (resource), y opcionalmente otros parámetros
+     */
     @PostMapping("/webhook")
     public ResponseEntity<Void> procesarWebhook(
-            @RequestParam String preference_id,
-            @RequestParam String payment_id,
-            @RequestParam String status) {
+            @RequestParam(required = false) String preference_id,
+            @RequestParam(required = false) String payment_id,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String external_reference,
+            @RequestParam(required = false) String topic,
+            @RequestParam(required = false) String type,
+            @RequestBody(required = false) Map<String, Object> payload) {
 
         try {
-            log.info("Webhook recibido - Preferencia: {}, Estado: {}", preference_id, status);
-            pedidoService.procesarWebhook(preference_id, payment_id, status);
+            log.info("🔔 ========== WEBHOOK RECIBIDO ==========");
+            log.info("📋 Parámetros recibidos:");
+            log.info("  - preference_id: {}", preference_id);
+            log.info("  - payment_id: {}", payment_id);
+            log.info("  - status: {}", status);
+            log.info("  - external_reference: {}", external_reference);
+            log.info("  - topic: {}", topic);
+            log.info("  - type: {}", type);
+            log.info("  - payload: {}", payload);
+            log.info("========================================");
+
+            // Mercado Pago puede enviar el webhook de varias formas
+            // Intentar procesar con la información disponible
+
+            if (preference_id != null && !preference_id.isEmpty()) {
+                log.info("🔄 Procesando webhook con preference_id: {}", preference_id);
+                pedidoService.procesarWebhook(preference_id, payment_id, status);
+            }
+            else if (external_reference != null && !external_reference.isEmpty()) {
+                log.info("🔄 Procesando webhook con external_reference: {}", external_reference);
+                // Si tienes external_reference, puedes buscar por ID
+                // pedidoService.procesarWebhookPorId(Long.parseLong(external_reference), payment_id, status);
+                log.warn("⚠️ Procesamiento por external_reference no implementado aún");
+            }
+            else {
+                log.warn("⚠️ Webhook recibido sin preference_id ni external_reference");
+                log.warn("⚠️ Payload completo: {}", payload);
+            }
+
+            // IMPORTANTE: Siempre retornar 200 OK para que Mercado Pago no reintente
             return ResponseEntity.ok().build();
+
         } catch (Exception e) {
-            log.error("Error procesando webhook", e);
-            // Retornar OK aunque sea error para que MP no reintente
+            log.error("❌ Error procesando webhook", e);
+            log.error("❌ Stack trace:", e);
+
+            // Aún con error, retornar OK para evitar reintentos infinitos
             return ResponseEntity.ok().build();
         }
+    }
+    // ============================================
+    // ENDPOINT ADICIONAL PARA DEBUGGING (OPCIONAL)
+    // Te ayuda a ver qué datos está enviando Mercado Pago
+    // ============================================
+    @GetMapping("/webhook/test")
+    public ResponseEntity<Map<String, String>> testWebhook() {
+        Map<String, String> response = new HashMap<>();
+        response.put("status", "Webhook endpoint is working");
+        response.put("timestamp", LocalDateTime.now().toString());
+        return ResponseEntity.ok(response);
     }
     @PreAuthorize("hasRole('ADMIN')")
     @GetMapping("/auditoria")
