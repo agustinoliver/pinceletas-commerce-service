@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 /**
  * Manejador global de excepciones para toda la aplicación
  */
-@RestControllerAdvice
+//@RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
     /**
@@ -39,6 +39,12 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(RuntimeException.class)
     public ResponseEntity<ErrorResponse> handleRuntimeException(RuntimeException ex) {
+        // ✅ EXCLUIR EXCEPCIONES DE SWAGGER
+        if (isSwaggerRelatedException(ex)) {
+            log.debug("Excepción de Swagger ignorada: {}", ex.getMessage());
+            return null; // Deja que Spring maneje esta excepción
+        }
+
         log.error("RuntimeException capturada: {}", ex.getMessage());
 
         ErrorResponse errorResponse = new ErrorResponse(
@@ -87,6 +93,12 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ErrorResponse> handleGenericException(Exception ex) {
+        // ✅ EXCLUIR EXCEPCIONES DE SWAGGER
+        if (isSwaggerRelatedException(ex)) {
+            log.debug("Excepción de Swagger ignorada: {}", ex.getMessage());
+            return null; // Deja que Spring maneje esta excepción
+        }
+
         log.error("Exception genérica capturada: {}", ex.getMessage(), ex);
 
         ErrorResponse errorResponse = new ErrorResponse(
@@ -96,6 +108,24 @@ public class GlobalExceptionHandler {
         );
 
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+    }
+
+    /**
+     * Verifica si la excepción está relacionada con Swagger
+     */
+    private boolean isSwaggerRelatedException(Exception ex) {
+        String message = ex.getMessage();
+        if (message == null) {
+            return false;
+        }
+
+        // Patrones comunes en excepciones de Swagger
+        return message.contains("swagger") ||
+                message.contains("openapi") ||
+                message.contains("api-docs") ||
+                message.contains("swagger-ui") ||
+                ex.getClass().getName().contains("swagger") ||
+                ex.getClass().getName().contains("openapi");
     }
 
     /**

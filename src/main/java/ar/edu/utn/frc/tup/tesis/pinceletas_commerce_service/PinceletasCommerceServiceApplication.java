@@ -12,6 +12,9 @@ import org.springframework.context.annotation.ComponentScan;
 public class PinceletasCommerceServiceApplication {
 
 	public static void main(String[] args) {
+		String accessToken = System.getenv("MERCADOPAGO_ACCESS_TOKEN");
+		System.out.println("🟢 Access Token detectado: " + accessToken);
+
 		SpringApplication.run(PinceletasCommerceServiceApplication.class, args);
 	}
 
