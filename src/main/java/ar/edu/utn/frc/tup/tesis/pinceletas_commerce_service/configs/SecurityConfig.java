@@ -2,6 +2,7 @@ package ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.configs;
 
 import ar.edu.utn.frc.tup.tesis.pinceletas.common.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -26,6 +27,9 @@ public class SecurityConfig {
 
 
     private final JwtAuthenticationFilter jwtAuthFilter;
+
+    @Value("${app.frontend.url:http://localhost:4200}")
+    private String frontendUrl;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -97,10 +101,14 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         System.out.println("➡️ CorsConfigurationSource bean initialized");
+        System.out.println("➡️ Frontend URL: " + frontendUrl);
 
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(
-                "http://localhost:4200"
+                "http://localhost:4200",
+                "https://interior-visiting-levy-expectations.trycloudflare.com",
+                "https://say-sys-next-embassy.trycloudflare.com",
+                "https://*.trycloudflare.com"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));

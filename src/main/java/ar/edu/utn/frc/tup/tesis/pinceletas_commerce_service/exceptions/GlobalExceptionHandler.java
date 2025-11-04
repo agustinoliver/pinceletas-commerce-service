@@ -14,7 +14,7 @@ import java.time.LocalDateTime;
 /**
  * Manejador global de excepciones para toda la aplicación
  */
-//@RestControllerAdvice
+@RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
     /**

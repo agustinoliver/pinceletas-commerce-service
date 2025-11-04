@@ -244,13 +244,11 @@ public class PedidoService {
 
                 // Limpiar carrito
                 try {
-                    limpiarCarrito(pedido.getUsuarioId());
-                    log.info("🧹 Carrito limpiado para usuario {}", pedido.getUsuarioId());
+                    limpiarCarritoDelPedido(pedido);
+                    log.info("🧹 Items del pedido limpiados del carrito");
                 } catch (Exception e) {
                     log.error("❌ Error limpiando carrito: {}", e.getMessage());
                 }
-
-                log.info("✅ Pago APROBADO para pedido {}", pedido.getNumeroPedido());
                 break;
 
             case "rejected":
@@ -498,13 +496,11 @@ public class PedidoService {
 
                 // Limpiar carrito del usuario
                 try {
-                    limpiarCarrito(pedido.getUsuarioId());
-                    log.info("🧹 Carrito limpiado para usuario {}", pedido.getUsuarioId());
+                    limpiarCarritoDelPedido(pedido);
+                    log.info("🧹 Items del pedido limpiados del carrito");
                 } catch (Exception e) {
                     log.error("❌ Error limpiando carrito: {}", e.getMessage());
                 }
-
-                log.info("✅ Pago APROBADO para pedido {}", pedido.getNumeroPedido());
                 break;
 
             case "rejected":
@@ -593,6 +589,92 @@ public class PedidoService {
         List<CarritoEntity> items = carritoRepository.findByUsuarioId(usuarioId);
         carritoRepository.deleteAll(items);
         log.info("Carrito limpiado para usuario {}", usuarioId);
+    }
+    /**
+     * ✅ Limpia SOLO los items del carrito que están en este pedido
+     */
+    private void limpiarCarritoDelPedido(PedidoEntity pedido) {
+        try {
+            log.info("🧹 Limpiando del carrito los productos del pedido: {}", pedido.getNumeroPedido());
+
+            // Obtener items del carrito del usuario
+            List<CarritoEntity> itemsCarrito = carritoRepository.findByUsuarioId(pedido.getUsuarioId());
+
+            if (itemsCarrito.isEmpty()) {
+                log.info("ℹ️ El carrito ya estaba vacío");
+                return;
+            }
+
+            log.info("📋 Items en carrito antes de limpiar: {}", itemsCarrito.size());
+
+            // ✅ SOLUCIÓN: Crear una lista de IDs de items a eliminar
+            List<Long> idsAEliminar = new ArrayList<>();
+
+            // Procesar cada item del pedido
+            for (ItemPedidoEntity itemPedido : pedido.getItems()) {
+                Long productoId = itemPedido.getProducto().getId();
+                Long opcionId = itemPedido.getOpcionSeleccionada() != null
+                        ? itemPedido.getOpcionSeleccionada().getId()
+                        : null;
+                int cantidadComprada = itemPedido.getCantidad();
+
+                log.info("📦 Buscando en carrito: Producto {} (opción: {}), cantidad comprada: {}",
+                        productoId, opcionId, cantidadComprada);
+
+                // Buscar el item EXACTO en el carrito
+                for (CarritoEntity itemCarrito : itemsCarrito) {
+                    boolean mismoProducto = itemCarrito.getProducto().getId().equals(productoId);
+
+                    // Verificar si tienen la misma opción
+                    boolean mismaOpcion;
+                    if (opcionId == null) {
+                        mismaOpcion = (itemCarrito.getOpcionSeleccionada() == null);
+                    } else {
+                        mismaOpcion = (itemCarrito.getOpcionSeleccionada() != null
+                                && itemCarrito.getOpcionSeleccionada().getId().equals(opcionId));
+                    }
+
+                    // Si coinciden producto Y opción
+                    if (mismoProducto && mismaOpcion) {
+                        int cantidadEnCarrito = itemCarrito.getCantidad();
+
+                        log.info("✅ Encontrado en carrito ID {}: cantidad {}",
+                                itemCarrito.getId(), cantidadEnCarrito);
+
+                        if (cantidadEnCarrito <= cantidadComprada) {
+                            idsAEliminar.add(itemCarrito.getId());
+                            log.info("🗑️ Marcado para eliminar completamente: item carrito ID {}",
+                                    itemCarrito.getId());
+                        } else {
+                            // Compró menos → actualizar cantidad
+                            int cantidadRestante = cantidadEnCarrito - cantidadComprada;
+                            itemCarrito.setCantidad(cantidadRestante);
+                            carritoRepository.save(itemCarrito);
+                            log.info("📝 Cantidad actualizada en carrito ID {}: {} -> {}",
+                                    itemCarrito.getId(), cantidadEnCarrito, cantidadRestante);
+                        }
+
+                        break;
+                    }
+                }
+            }
+
+            // Eliminar los items marcados
+            if (!idsAEliminar.isEmpty()) {
+                List<CarritoEntity> itemsAEliminar = carritoRepository.findAllById(idsAEliminar);
+                carritoRepository.deleteAll(itemsAEliminar);
+                log.info("🗑️ Eliminados {} items del carrito", idsAEliminar.size());
+            }
+
+            // Verificar resultado final
+            List<CarritoEntity> carritoFinal = carritoRepository.findByUsuarioId(pedido.getUsuarioId());
+            log.info("✅ Items en carrito después de limpiar: {}", carritoFinal.size());
+            log.info("✅ Limpieza del carrito completada");
+
+        } catch (Exception e) {
+            log.error("❌ Error limpiando carrito del pedido: {}", e.getMessage(), e);
+            // No lanzar excepción para no afectar el flujo principal
+        }
     }
 
     private String generarNumeroPedido() {
