@@ -1,11 +1,16 @@
 package ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.services;
 
 
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.OrdersByDateReport;
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.OrdersByStatusReport;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.ProductsByCategoryReport;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.TopSellingProductsReport;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.entities.CategoriaEntity;
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.entities.PedidoEntity;
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.enums.EstadoPedido;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.repositories.CategoriaRepository;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.repositories.ItemPedidoRepository;
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.repositories.PedidoRepository;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.repositories.ProductoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +19,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -32,6 +38,7 @@ public class CommerceReportService {
     private final ProductoRepository productoRepository;
     private final CategoriaRepository categoriaRepository;
     private final ItemPedidoRepository itemPedidoRepository;
+    private final PedidoRepository pedidoRepository;
 
     /**
      * Genera un reporte con el conteo de productos por categoría.
@@ -168,5 +175,149 @@ public class CommerceReportService {
                 totalProducts, activeProducts, inactiveProducts);
 
         return stats;
+    }
+
+    /**
+     * Genera un reporte de pedidos agrupados por fecha.
+     * Permite filtrar por rango de fechas.
+     *
+     * @param startDate Fecha inicial del rango (opcional).
+     * @param endDate Fecha final del rango (opcional).
+     * @return Lista de OrdersByDateReport con estadísticas por fecha.
+     */
+    @Cacheable(value = "ordersByDate", key = "#startDate + '-' + #endDate", unless = "#result.isEmpty()")
+    public List<OrdersByDateReport> getOrdersByDate(LocalDate startDate, LocalDate endDate) {
+        log.info("Generando reporte de pedidos por fecha - Rango: {} a {}", startDate, endDate);
+
+        List<PedidoEntity> allPedidos;
+
+        // Si no se especifican fechas, usar los últimos 30 días
+        if (startDate == null || endDate == null) {
+            LocalDate end = LocalDate.now();
+            LocalDate start = end.minusDays(30);
+
+            allPedidos = pedidoRepository.findAll().stream()
+                    .filter(p -> {
+                        LocalDate pedidoDate = p.getFechaCreacion().toLocalDate();
+                        return !pedidoDate.isBefore(start) && !pedidoDate.isAfter(end);
+                    })
+                    .collect(Collectors.toList());
+        } else {
+            allPedidos = pedidoRepository.findAll().stream()
+                    .filter(p -> {
+                        LocalDate pedidoDate = p.getFechaCreacion().toLocalDate();
+                        return !pedidoDate.isBefore(startDate) && !pedidoDate.isAfter(endDate);
+                    })
+                    .collect(Collectors.toList());
+        }
+
+        if (allPedidos.isEmpty()) {
+            log.warn("No hay pedidos en el rango de fechas especificado");
+            return new ArrayList<>();
+        }
+
+        // Agrupar por fecha
+        Map<LocalDate, List<PedidoEntity>> pedidosPorFecha = allPedidos.stream()
+                .collect(Collectors.groupingBy(p -> p.getFechaCreacion().toLocalDate()));
+
+        // Generar reporte
+        List<OrdersByDateReport> reports = new ArrayList<>();
+
+        for (Map.Entry<LocalDate, List<PedidoEntity>> entry : pedidosPorFecha.entrySet()) {
+            LocalDate fecha = entry.getKey();
+            List<PedidoEntity> pedidosDelDia = entry.getValue();
+
+            long totalOrders = pedidosDelDia.size();
+
+            BigDecimal totalRevenue = pedidosDelDia.stream()
+                    .map(PedidoEntity::getTotal)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            long completedOrders = pedidosDelDia.stream()
+                    .filter(p -> p.getEstado() == EstadoPedido.ENTREGADO)
+                    .count();
+
+            long cancelledOrders = pedidosDelDia.stream()
+                    .filter(p -> p.getEstado() == EstadoPedido.CANCELADO ||
+                            p.getEstado() == EstadoPedido.REEMBOLSADO)
+                    .count();
+
+            long pendingOrders = pedidosDelDia.stream()
+                    .filter(p -> p.getEstado() == EstadoPedido.PENDIENTE ||
+                            p.getEstado() == EstadoPedido.PENDIENTE_PAGO)
+                    .count();
+
+            OrdersByDateReport report = OrdersByDateReport.builder()
+                    .date(fecha)
+                    .totalOrders(totalOrders)
+                    .totalRevenue(totalRevenue)
+                    .completedOrders(completedOrders)
+                    .cancelledOrders(cancelledOrders)
+                    .pendingOrders(pendingOrders)
+                    .build();
+
+            reports.add(report);
+        }
+
+        // Ordenar por fecha descendente
+        reports.sort((a, b) -> b.getDate().compareTo(a.getDate()));
+
+        log.info("Reporte de pedidos por fecha generado: {} días con pedidos", reports.size());
+        return reports;
+    }
+
+    /**
+     * Genera un reporte de pedidos agrupados por estado.
+     * Muestra estadísticas de cada estado de pedido.
+     *
+     * @return Lista de OrdersByStatusReport con estadísticas por estado.
+     */
+    @Cacheable(value = "ordersByStatus", unless = "#result.isEmpty()")
+    public List<OrdersByStatusReport> getOrdersByStatus() {
+        log.info("Generando reporte de pedidos por estado");
+
+        List<PedidoEntity> allPedidos = pedidoRepository.findAll();
+
+        if (allPedidos.isEmpty()) {
+            log.warn("No hay pedidos para generar el reporte");
+            return new ArrayList<>();
+        }
+
+        long totalPedidos = allPedidos.size();
+
+        // Agrupar por estado
+        Map<EstadoPedido, List<PedidoEntity>> pedidosPorEstado = allPedidos.stream()
+                .collect(Collectors.groupingBy(PedidoEntity::getEstado));
+
+        // Generar reporte
+        List<OrdersByStatusReport> reports = new ArrayList<>();
+
+        for (Map.Entry<EstadoPedido, List<PedidoEntity>> entry : pedidosPorEstado.entrySet()) {
+            EstadoPedido estado = entry.getKey();
+            List<PedidoEntity> pedidosDelEstado = entry.getValue();
+
+            long totalOrders = pedidosDelEstado.size();
+
+            BigDecimal totalRevenue = pedidosDelEstado.stream()
+                    .map(PedidoEntity::getTotal)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            double percentage = (double) totalOrders / totalPedidos * 100;
+
+            OrdersByStatusReport report = OrdersByStatusReport.builder()
+                    .status(estado.name())
+                    .totalOrders(totalOrders)
+                    .totalRevenue(totalRevenue)
+                    .percentage(Math.round(percentage * 100.0) / 100.0)
+                    .build();
+
+            reports.add(report);
+        }
+
+        // Ordenar por cantidad de pedidos descendente
+        reports.sort((a, b) -> b.getTotalOrders().compareTo(a.getTotalOrders()));
+
+        log.info("Reporte de pedidos por estado generado: {} estados", reports.size());
+        return reports;
     }
 }

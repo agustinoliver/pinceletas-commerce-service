@@ -1,5 +1,7 @@
 package ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.controllers;
 
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.OrdersByDateReport;
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.OrdersByStatusReport;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.ProductsByCategoryReport;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.TopSellingProductsReport;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.services.CommerceReportService;
@@ -8,9 +10,11 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -84,5 +88,52 @@ public class CommerceReportController {
         Map<String, Long> stats = reportService.getProductGeneralStats();
         log.info("✅ Estadísticas generadas: {} métricas", stats.size());
         return ResponseEntity.ok(stats);
+    }
+
+    /**
+     * Obtiene el reporte de pedidos agrupados por fecha.
+     * Permite filtrar por rango de fechas.
+     *
+     * @param startDate Fecha inicial del rango (formato: yyyy-MM-dd, opcional).
+     * @param endDate Fecha final del rango (formato: yyyy-MM-dd, opcional).
+     * @return Lista de OrdersByDateReport con estadísticas por fecha.
+     */
+    @GetMapping("/orders/by-date")
+    @Operation(
+            summary = "Obtener pedidos por fecha",
+            description = "Devuelve estadísticas de pedidos agrupados por fecha. " +
+                    "Si no se especifican fechas, devuelve los últimos 30 días."
+    )
+    public ResponseEntity<List<OrdersByDateReport>> getOrdersByDate(
+            @Parameter(description = "Fecha inicial del rango (yyyy-MM-dd)")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+
+            @Parameter(description = "Fecha final del rango (yyyy-MM-dd)")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        log.info("📊 Solicitud de reporte: Pedidos por fecha - Rango: {} a {}", startDate, endDate);
+        List<OrdersByDateReport> report = reportService.getOrdersByDate(startDate, endDate);
+        log.info("✅ Reporte generado: {} fechas con pedidos", report.size());
+        return ResponseEntity.ok(report);
+    }
+
+    /**
+     * Obtiene el reporte de pedidos agrupados por estado.
+     * Muestra estadísticas de cada estado de pedido.
+     *
+     * @return Lista de OrdersByStatusReport con estadísticas por estado.
+     */
+    @GetMapping("/orders/by-status")
+    @Operation(
+            summary = "Obtener pedidos por estado",
+            description = "Devuelve estadísticas de pedidos agrupados por estado (PENDIENTE, PAGADO, etc.)"
+    )
+    public ResponseEntity<List<OrdersByStatusReport>> getOrdersByStatus() {
+        log.info("📊 Solicitud de reporte: Pedidos por estado");
+        List<OrdersByStatusReport> report = reportService.getOrdersByStatus();
+        log.info("✅ Reporte generado: {} estados", report.size());
+        return ResponseEntity.ok(report);
     }
 }
