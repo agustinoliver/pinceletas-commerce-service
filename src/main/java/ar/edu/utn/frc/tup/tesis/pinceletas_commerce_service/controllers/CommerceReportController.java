@@ -1,9 +1,6 @@
 package ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.controllers;
 
-import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.OrdersByDateReport;
-import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.OrdersByStatusReport;
-import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.ProductsByCategoryReport;
-import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.TopSellingProductsReport;
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.dtos.reports.*;
 import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.services.CommerceReportService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -134,6 +131,38 @@ public class CommerceReportController {
         log.info("📊 Solicitud de reporte: Pedidos por estado");
         List<OrdersByStatusReport> report = reportService.getOrdersByStatus();
         log.info("✅ Reporte generado: {} estados", report.size());
+        return ResponseEntity.ok(report);
+    }
+
+    /**
+     * Obtiene el reporte de compras agrupadas por usuario.
+     * Permite filtrar por rango de fechas.
+     * Retorna información agregada de cada usuario: cantidad de compras,
+     * monto total gastado, promedio y última compra.
+     *
+     * @param startDate Fecha inicial del rango (formato: yyyy-MM-dd, opcional).
+     * @param endDate Fecha final del rango (formato: yyyy-MM-dd, opcional).
+     * @return Lista de PurchasesByUserReport con estadísticas por usuario.
+     */
+    @GetMapping("/purchases/by-user")
+    @Operation(
+            summary = "Obtener compras por usuario",
+            description = "Devuelve estadísticas de compras agrupadas por usuario. " +
+                    "Si no se especifican fechas, incluye todos los pedidos históricos. " +
+                    "Los usuarios están ordenados por monto total gastado (mayor a menor)."
+    )
+    public ResponseEntity<List<PurchasesByUserReport>> getPurchasesByUser(
+            @Parameter(description = "Fecha inicial del rango (yyyy-MM-dd)")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+
+            @Parameter(description = "Fecha final del rango (yyyy-MM-dd)")
+            @RequestParam(required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate) {
+
+        log.info("📊 Solicitud de reporte: Compras por usuario - Rango: {} a {}", startDate, endDate);
+        List<PurchasesByUserReport> report = reportService.getPurchasesByUser(startDate, endDate);
+        log.info("✅ Reporte generado: {} usuarios con compras", report.size());
         return ResponseEntity.ok(report);
     }
 }

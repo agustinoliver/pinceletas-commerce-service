@@ -332,7 +332,6 @@ public class CommerceReportService {
                         .averageOrderAmount(averageOrderAmount)
                         .lastPurchaseDate(ultimoPedido != null ? ultimoPedido.getFechaCreacion() : null)
                         .lastOrderStatus(ultimoPedido != null ? ultimoPedido.getEstado().name() : null)
-                        .lastOrderNumber(ultimoPedido != null ? ultimoPedido.getNumeroPedido() : null)
                         .build();
 
                 reports.add(report);
