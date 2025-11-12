@@ -46,14 +46,14 @@ public class CategoriaController {
     }
 
     // ✅ GET /categorias- → Lista con productos incluidos
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+
     @GetMapping("/all-con-products")
     public ResponseEntity<List<CategoriaEntity>> listarCategoriasEntity() {
         return ResponseEntity.ok(categoriaService.listarCategorias());
     }
 
     // ✅ GET /categorias/{id}/entity → Una sola categoría con productos
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+
     @GetMapping("/{id}/one-con-products")
     public ResponseEntity<CategoriaEntity> obtenerCategoriaEntity(@PathVariable Long id) {
         return ResponseEntity.ok(categoriaService.consultarCategoria(id));

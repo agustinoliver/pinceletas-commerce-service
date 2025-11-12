@@ -25,6 +25,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
+
     private final JwtAuthenticationFilter jwtAuthFilter;
 
     @Value("${app.frontend.url:http://localhost:4200}")
@@ -36,11 +37,6 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf.disable())
                 .authorizeHttpRequests(auth -> auth
-                        // ========================================
-                        // 1. ENDPOINTS COMPLETAMENTE PÚBLICOS
-                        // ========================================
-
-                        // Swagger/OpenAPI
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**",
@@ -48,73 +44,63 @@ public class SecurityConfig {
                                 "/webjars/**",
                                 "/swagger-resources/**"
                         ).permitAll()
-
-                        // Health checks
                         .requestMatchers("/health", "/actuator/health").permitAll()
 
-                        // Imágenes (acceso público)
+                        // Permitir acceso público a las imágenes
                         .requestMatchers("/uploads/**").permitAll()
 
-                        // ✅ PRODUCTOS Y CATEGORÍAS - Solo GET público
-                        .requestMatchers(HttpMethod.GET, "/productos/**").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/categorias/**").permitAll()
+                        .requestMatchers("/productos/public/**").permitAll()
 
-                        // Webhook de Mercado Pago (debe estar ANTES de /pedidos)
+                        // 🔥 WEBHOOK DE MERCADO PAGO - DEBE ESTAR PRIMERO
                         .requestMatchers(HttpMethod.POST, "/pedidos/webhook").permitAll()
-                        .requestMatchers(HttpMethod.GET, "/pedidos/webhook/test").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/pedidos/webhook/test").permitAll() // Para testing
+
 
                         // Reportes para comunicación entre microservicios
                         .requestMatchers(HttpMethod.GET, "/api/reports/**").permitAll()
 
-                        // ========================================
-                        // 2. PRODUCTOS - Operaciones protegidas
-                        // ========================================
-                        .requestMatchers(HttpMethod.POST, "/productos/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/productos/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/productos/**").hasRole("ADMIN")
-
-                        // ========================================
-                        // 3. CATEGORÍAS - Operaciones protegidas
-                        // ========================================
-                        .requestMatchers(HttpMethod.POST, "/categorias/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/categorias/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/categorias/**").hasRole("ADMIN")
-
-                        // ========================================
-                        // 4. PEDIDOS - Rutas específicas primero
-                        // ========================================
+                        // Rutas específicas de pedidos primero
                         .requestMatchers(HttpMethod.GET, "/pedidos/usuario/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers(HttpMethod.GET, "/pedidos/numero/**").hasAnyRole("USER", "ADMIN")
 
-                        // Pedidos generales
+                        // ✅ 4. LUEGO RUTAS GENERALES DE PEDIDOS
                         .requestMatchers(HttpMethod.POST, "/pedidos").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/pedidos/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/pedidos/**").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/pedidos/").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/pedidos/").hasRole("ADMIN")
 
-                        // ========================================
-                        // 5. OPCIONES DE PRODUCTOS
-                        // ========================================
-                        .requestMatchers(HttpMethod.GET, "/opciones-productos/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/opciones-productos/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers(HttpMethod.PUT, "/opciones-productos/**").hasRole("ADMIN")
-                        .requestMatchers(HttpMethod.DELETE, "/opciones-productos/**").hasRole("ADMIN")
 
-                        // ========================================
-                        // 6. FAVORITOS Y CARRITO (requieren autenticación)
-                        // ========================================
-                        .requestMatchers("/favoritos/**").hasAnyRole("USER", "ADMIN")
-                        .requestMatchers("/carrito/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/productos/").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/productos/").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/productos/").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/productos/").hasRole("ADMIN")
 
-                        // ========================================
-                        // 7. CUALQUIER OTRA PETICIÓN
-                        // ========================================
+                        .requestMatchers(HttpMethod.GET, "/categorias/").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/categorias/").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/categorias/").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/categorias/").hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/opciones-productos/").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/opciones-productos/").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/opciones-productos/").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/opciones-productos/").hasRole("ADMIN")
+
+                        .requestMatchers(HttpMethod.GET, "/configuraciones-envio/activa").permitAll()
+                        .requestMatchers(HttpMethod.GET, "/configuraciones-envio/calcular-costo").permitAll()
+                        .requestMatchers("/configuraciones-envio/**").hasRole("ADMIN")
+
+                        .requestMatchers("/favoritos/").hasAnyRole("USER", "ADMIN")
+
+                        .requestMatchers("/carrito/").hasAnyRole("USER", "ADMIN")
+
                         .anyRequest().authenticated()
+
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
+
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
@@ -124,8 +110,8 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(List.of(
                 "http://localhost:4200",
-                "https://interior-visiting-levy-expectations.trycloudflare.com",
-                "https://say-sys-next-embassy.trycloudflare.com",
+                "https://opposite-tribes-webcams-seeker.trycloudflare.com",
+                "https://green-order-happen-arizona.trycloudflare.com",
                 "https://*.trycloudflare.com"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));

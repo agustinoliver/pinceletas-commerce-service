@@ -175,7 +175,7 @@ public class ProductoController {
     }
 
     // ✅ OBTENER PRODUCTO POR ID
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+
     @GetMapping("/{id}")
     public ResponseEntity<ProductoEntity> obtenerProducto(@PathVariable Long id) {
         ProductoEntity producto = productoService.getProductoById(id);
@@ -183,7 +183,7 @@ public class ProductoController {
     }
 
     // ✅ LISTAR TODOS LOS PRODUCTOS
-    @PreAuthorize("hasAnyRole('USER', 'ADMIN')")
+
     @GetMapping
     public ResponseEntity<List<ProductoEntity>> listarProductos() {
         List<ProductoEntity> productos = productoService.listarProductos();

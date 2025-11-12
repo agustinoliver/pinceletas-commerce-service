@@ -36,6 +36,9 @@ public class PedidoService {
     private final MercadoPagoService mercadoPagoService;
     private final AuditoriaPedidoRepository auditoriaPedidoRepository;
 
+    // ✅ NUEVA DEPENDENCIA - Agregar esto
+    private final ConfiguracionEnvioService configuracionEnvioService;
+
 
     @Transactional
     public PedidoResponseDTO crearPedido(PedidoRequestDTO pedidoRequest, String authToken) {
@@ -49,8 +52,22 @@ public class PedidoService {
 
         validarDireccionUsuario(usuario);
 
-        BigDecimal total = calcularTotalPedido(pedidoRequest.getItems());
-        log.info("Total del pedido calculado: {}", total);
+        // ✅ ACTUALIZADO: Calcular total de productos
+        BigDecimal totalProductos = calcularTotalPedido(pedidoRequest.getItems());
+
+        // ✅ NUEVO: Calcular costo de envío usando la configuración
+        BigDecimal costoEnvio = BigDecimal.ZERO;
+        if ("envio".equals(pedidoRequest.getTipoEntrega())) {
+            costoEnvio = configuracionEnvioService.obtenerCostoEnvio(totalProductos);
+            log.info("Costo de envío calculado: {} para subtotal: {}", costoEnvio, totalProductos);
+        } else {
+            log.info("Retiro en local - costo de envío: 0");
+        }
+
+        // ✅ ACTUALIZADO: Total final incluye envío
+        BigDecimal total = totalProductos.add(costoEnvio);
+        log.info("Total del pedido calculado: {} (Productos: {}, Envío: {})",
+                total, totalProductos, costoEnvio);
 
         PedidoEntity pedido = new PedidoEntity();
         pedido.setNumeroPedido(generarNumeroPedido());
@@ -540,6 +557,7 @@ public class PedidoService {
             log.error("❌ Error enviando notificación de estado de pago: {}", e.getMessage());
         }
     }
+
     // ============================================
     // MÉTODO AUXILIAR PARA ENVIAR NOTIFICACIONES
     // (Opcional - solo si quieres notificar al usuario)
