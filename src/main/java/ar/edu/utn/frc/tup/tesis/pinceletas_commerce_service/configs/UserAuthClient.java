@@ -13,7 +13,7 @@ import org.springframework.web.client.RestTemplate;
 @Slf4j
 public class UserAuthClient {private final RestTemplate restTemplate;
 
-    @Value("${services.user-auth.url:http://localhost:8081}")
+    @Value("${services.user-auth.url:https://pinceletas-user-auth.onrender.com}")
     private String userAuthServiceUrl;
 
     public UserResponseDTO obtenerUsuarioPorEmail(String email, String token) {
