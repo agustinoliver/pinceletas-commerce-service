@@ -1,6 +1,6 @@
 package ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.configs;
 
-import ar.edu.utn.frc.tup.tesis.pinceletas.common.security.JwtAuthenticationFilter;
+import ar.edu.utn.frc.tup.tesis.pinceletas_commerce_service.security.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
