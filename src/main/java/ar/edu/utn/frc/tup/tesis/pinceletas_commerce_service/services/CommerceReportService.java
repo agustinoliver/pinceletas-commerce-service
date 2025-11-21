@@ -349,7 +349,7 @@ public class CommerceReportService {
 
     private UserResponseDTO obtenerInformacionUsuario(Long usuarioId) {
         try {
-            String url = "http://localhost:8081/api/users/by-id/" + usuarioId;
+            String url = "https://pinceletas-user-auth.onrender.com/api/users/by-id/" + usuarioId;
 
             HttpHeaders headers = new HttpHeaders();
             headers.setContentType(MediaType.APPLICATION_JSON);

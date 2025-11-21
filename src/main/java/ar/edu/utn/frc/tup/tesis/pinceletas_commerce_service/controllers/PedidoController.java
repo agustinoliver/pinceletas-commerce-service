@@ -150,7 +150,7 @@ public class PedidoController {
         Map<String, String> response = new HashMap<>();
         response.put("status", "Webhook endpoint is working");
         response.put("timestamp", LocalDateTime.now().toString());
-        response.put("url", "https://phylacterical-cletus-unagitated.ngrok-free.dev/pedidos/webhook");
+        response.put("url", "https://pinceletas-commerce-service.onrender.com/pedidos/webhook");
         return ResponseEntity.ok(response);
     }
     @PreAuthorize("hasRole('ADMIN')")

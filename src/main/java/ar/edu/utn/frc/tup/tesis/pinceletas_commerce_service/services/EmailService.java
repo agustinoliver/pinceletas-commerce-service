@@ -91,7 +91,7 @@ public class EmailService {
             String imagenProducto,
             Long productoId) {
 
-        String urlProducto = "http://localhost:4200/productos/" + productoId;
+        String urlProducto = "https://pinceletas-frontend.onrender.com/productos/" + productoId;
         // 🔥 CORRECCIÓN: Construcción correcta de la URL de la imagen
         String urlImagen = imageHostingService.getPublicImageUrl(imagenProducto);
         log.info("🖼️ URL pública de imagen para email: {}", urlImagen);
@@ -168,7 +168,7 @@ public class EmailService {
                     <div style="background-color: #f3f3f3; text-align: center; padding: 20px; font-size: 12px; color: #777;">
                         <p style="margin: 0 0 10px 0;">© 2025 Pinceletas. Todos los derechos reservados.</p>
                         <p style="margin: 0;">
-                            <a href="http://localhost:4200/favoritos" style="color: #ED620C; text-decoration: none;">Ver todos mis favoritos</a>
+                            <a href="https://pinceletas-frontend.onrender.com/favoritos" style="color: #ED620C; text-decoration: none;">Ver todos mis favoritos</a>
                         </p>
                     </div>
                 </div>
