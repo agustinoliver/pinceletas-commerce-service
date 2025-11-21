@@ -126,7 +126,9 @@ public class SecurityConfig {
                 "http://localhost:4200",
                 "https://interior-visiting-levy-expectations.trycloudflare.com",
                 "https://say-sys-next-embassy.trycloudflare.com",
-                "https://*.trycloudflare.com"
+                "https://*.trycloudflare.com",
+                "https://pinceletas-commerce-service.onrender.com",
+                "https://pinceletas-frontend.onrender.com"
         ));
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
